@@ -3,9 +3,80 @@ const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ─── In-memory license store ──────────────────────────────────────────
-// In production, replace with a real DB (Postgres, MongoDB, etc.)
-// Key: email → { plan: 'monthly'|'lifetime', active: bool, customerId, subscriptionId }
 const licenses = new Map();
+
+// ─── Auto-create Stripe products if price IDs not set ────────────────
+// This means you NEVER have to manually copy price IDs — just set your
+// STRIPE_SECRET_KEY and the products are created automatically on boot.
+let cachedPrices = {
+  monthly: process.env.STRIPE_PRICE_MONTHLY || null,
+  lifetime: process.env.STRIPE_PRICE_LIFETIME || null,
+};
+
+async function ensurePrices() {
+  if (cachedPrices.monthly && cachedPrices.lifetime) return; // already set
+
+  console.log('⚙️  Price IDs not configured — auto-creating Stripe products...');
+
+  try {
+    // Search for existing products first to avoid duplicates
+    const existing = await stripe.products.list({ limit: 20, active: true });
+
+    let monthlyProduct = existing.data.find(p => p.name === 'Pro Monthly');
+    let lifetimeProduct = existing.data.find(p => p.name === 'Lifetime Access');
+
+    if (!monthlyProduct) {
+      monthlyProduct = await stripe.products.create({ name: 'Pro Monthly', description: 'Full access, cancel anytime.' });
+      console.log('✅ Created product: Pro Monthly');
+    }
+
+    if (!lifetimeProduct) {
+      lifetimeProduct = await stripe.products.create({ name: 'Lifetime Access', description: 'Pay once, use forever.' });
+      console.log('✅ Created product: Lifetime Access');
+    }
+
+    // Check for existing prices on these products
+    if (!cachedPrices.monthly) {
+      const existingPrices = await stripe.prices.list({ product: monthlyProduct.id, active: true });
+      const existing12 = existingPrices.data.find(p => p.unit_amount === 1200 && p.recurring?.interval === 'month');
+      if (existing12) {
+        cachedPrices.monthly = existing12.id;
+      } else {
+        const price = await stripe.prices.create({
+          product: monthlyProduct.id,
+          unit_amount: 1200,
+          currency: 'usd',
+          recurring: { interval: 'month' },
+        });
+        cachedPrices.monthly = price.id;
+        console.log('✅ Created price: $12/mo →', price.id);
+      }
+    }
+
+    if (!cachedPrices.lifetime) {
+      const existingPrices = await stripe.prices.list({ product: lifetimeProduct.id, active: true });
+      const existing49 = existingPrices.data.find(p => p.unit_amount === 4900 && !p.recurring);
+      if (existing49) {
+        cachedPrices.lifetime = existing49.id;
+      } else {
+        const price = await stripe.prices.create({
+          product: lifetimeProduct.id,
+          unit_amount: 4900,
+          currency: 'usd',
+        });
+        cachedPrices.lifetime = price.id;
+        console.log('✅ Created price: $49 one-time →', price.id);
+      }
+    }
+
+    console.log('💰 Prices ready — monthly:', cachedPrices.monthly, '| lifetime:', cachedPrices.lifetime);
+  } catch (err) {
+    console.error('❌ Could not auto-create Stripe products:', err.message);
+  }
+}
+
+// Run on startup
+ensurePrices();
 
 // ─── Helper: check if email has active access ─────────────────────────
 function hasAccess(email) {
@@ -15,7 +86,6 @@ function hasAccess(email) {
 }
 
 // ─── POST /api/stripe/checkout ────────────────────────────────────────
-// Creates a Stripe Checkout session and returns the URL
 router.post('/checkout', async (req, res) => {
   const { plan, email } = req.body;
 
@@ -23,12 +93,13 @@ router.post('/checkout', async (req, res) => {
     return res.status(400).json({ error: 'Invalid plan. Use "monthly" or "lifetime".' });
   }
 
-  const priceId = plan === 'monthly'
-    ? process.env.STRIPE_PRICE_MONTHLY
-    : process.env.STRIPE_PRICE_LIFETIME;
+  // Ensure prices exist (in case startup hasn't finished)
+  await ensurePrices();
+
+  const priceId = plan === 'monthly' ? cachedPrices.monthly : cachedPrices.lifetime;
 
   if (!priceId) {
-    return res.status(500).json({ error: `Price ID for "${plan}" not configured in .env` });
+    return res.status(500).json({ error: `Could not find or create price for "${plan}". Check your STRIPE_SECRET_KEY.` });
   }
 
   try {
