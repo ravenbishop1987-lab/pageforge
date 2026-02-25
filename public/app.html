@@ -626,7 +626,7 @@
     display: none;
   }
 
-  .result-section.visible { display: block; }
+  .result-section.visible { display: block !important; }
 
   .result-card {
     background: var(--surface);
@@ -2280,10 +2280,21 @@ async function generateSilo() {
 
     siloBlueprint = text;
     document.getElementById('siloBlueprintOutput').textContent = text;
-    document.getElementById('siloResultSection').classList.add('visible');
+
+    // Show result section — use inline style so it can never be toggled away
+    const resultEl = document.getElementById('siloResultSection');
+    resultEl.classList.add('visible');
+    resultEl.style.display = 'block';
+
+    // Reset build panel state in case this is a re-generate
+    document.getElementById('buildStatusPanel').style.display = 'none';
+    document.getElementById('buildPagesBtn').disabled = false;
+    document.getElementById('buildPagesBtn').textContent = '⚡ Build All Pages';
+    if (!siloZip) document.getElementById('downloadZipBtn').style.display = 'none';
+
     setTimeout(() => {
-      document.getElementById('siloResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 200);
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
     showToast('success', 'Blueprint generated!');
 
   } catch(err) {
@@ -2410,8 +2421,11 @@ function downloadSiloBlueprint() {
 
 let siloZip = null;
 let builtPages = [];
+let isBuilding = false;
 
 async function buildSiloPages() {
+  if (isBuilding) return;
+  isBuilding = true;
   const pillarTitle = document.getElementById('pillarTitle').value.trim();
   const pillarSlug  = document.getElementById('pillarSlug').value.trim();
   const pillarPKw   = document.getElementById('pillarPrimaryKw').value.trim();
@@ -2420,8 +2434,8 @@ async function buildSiloPages() {
   const tone        = 'professional';
   const wc          = 1500;
 
-  if (!pillarTitle || !pillarSlug) { showToast('error', 'Missing pillar details'); return; }
-  if (validPosts.length === 0)     { showToast('error', 'No child posts to build'); return; }
+  if (!pillarTitle || !pillarSlug) { isBuilding = false; showToast('error', 'Missing pillar details'); return; }
+  if (validPosts.length === 0)     { isBuilding = false; showToast('error', 'No child posts to build'); return; }
 
   // Build page queue: pillar first, then children
   const queue = [
@@ -2469,6 +2483,11 @@ async function buildSiloPages() {
   document.getElementById('buildStatusCount').textContent = `0 / ${total}`;
   document.getElementById('buildProgressFill').style.width = '0%';
   document.getElementById('buildProgressFill').style.background = '#111';
+
+  // Scroll status panel into view
+  setTimeout(() => {
+    document.getElementById('buildStatusPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
 
   // Render all rows as pending
   document.getElementById('buildPageRows').innerHTML = queue.map((pg, i) =>
@@ -2542,6 +2561,7 @@ async function buildSiloPages() {
     allOk ? 'var(--success)' : 'var(--warning)';
   document.getElementById('buildPagesBtn').disabled = false;
   document.getElementById('buildPagesBtn').textContent = '⚡ Rebuild All Pages';
+  isBuilding = false;
 
   if (successCount > 0) {
     siloZip = new JSZip();
