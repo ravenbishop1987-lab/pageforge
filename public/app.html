@@ -941,10 +941,24 @@
   <!-- HERO -->
   <div class="hero">
     <div class="hero-eyebrow">Powered by Claude AI</div>
-    <h1 class="hero-title">SEO-optimized pages,<br>in seconds.</h1>
-    <p class="hero-sub">Generate WordPress-ready HTML with full SEO optimization — schema markup, meta tags, and 20-point SEO scoring.</p>
+    <h1 class="hero-title" id="heroTitle">SEO-optimized pages,<br>in seconds.</h1>
+    <p class="hero-sub" id="heroSub">Generate WordPress-ready HTML with full SEO optimization — schema markup, meta tags, and 20-point SEO scoring.</p>
+
+    <!-- MODE SWITCHER -->
+    <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:20px;background:var(--bg);">
+      <button id="modePageBtn" onclick="switchMode('page')"
+        style="padding:8px 20px;font-size:13px;font-weight:500;border:none;cursor:pointer;transition:all 0.15s;font-family:var(--sans);background:#111;color:#fff;">
+        📄 Page Builder
+      </button>
+      <button id="modeSiloBtn" onclick="switchMode('silo')"
+        style="padding:8px 20px;font-size:13px;font-weight:500;border:none;cursor:pointer;transition:all 0.15s;font-family:var(--sans);background:transparent;color:var(--muted);">
+        🏗 Silo Builder
+      </button>
+    </div>
   </div>
 
+  <!-- PAGE BUILDER SECTION -->
+  <div id="pageBuilderSection">
   <!-- STEPS -->
   <div class="steps-container">
 
@@ -1030,8 +1044,20 @@
             </div>
           </div>
           <div class="field">
-            <label>Target URL</label>
-            <input type="text" id="targetUrl" placeholder="https://example.com/my-page/">
+            <label>Page Slug <span class="label-hint">— URL-safe, no spaces, use hyphens</span></label>
+            <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);transition:border-color 0.15s,box-shadow 0.15s;" id="slugWrap">
+              <span style="padding:10px 10px 10px 12px;font-size:13px;color:var(--muted);font-family:var(--mono);white-space:nowrap;border-right:1px solid var(--border);background:var(--bg);">/</span>
+              <input type="text" id="pageSlug" placeholder="my-page-slug" oninput="onSlugInput()"
+                style="border:none;border-radius:0;box-shadow:none;flex:1;font-family:var(--mono);font-size:13px;"
+                onfocus="document.getElementById('slugWrap').style.borderColor='var(--border-focus)';document.getElementById('slugWrap').style.boxShadow='0 0 0 3px rgba(0,0,0,0.06)'"
+                onblur="document.getElementById('slugWrap').style.borderColor='var(--border)';document.getElementById('slugWrap').style.boxShadow='none';sanitizeSlug()">
+              <span id="slugStatus" style="padding:10px 10px;font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap;"></span>
+            </div>
+            <div class="hint-text">Auto-generated from your focus keyword — edit freely. Used exactly as-is in your URL.</div>
+          </div>
+          <div class="field">
+            <label>Target URL <span class="label-hint">— auto-built from slug, or override</span></label>
+            <input type="text" id="targetUrl" placeholder="https://example.com/my-page/" oninput="slugUrlManual=true">
           </div>
           <div class="field">
             <label>Target Word Count</label>
@@ -1149,7 +1175,145 @@
     </div>
   </div>
 
-</div>
+</div><!-- /pageBuilderSection -->
+
+  <!-- ═══════════════════════════════════════════
+       SILO BUILDER SECTION
+  ════════════════════════════════════════════ -->
+  <div id="siloBuilderSection" style="display:none;">
+    <div class="steps-container">
+
+      <!-- SILO STEP 1: Pillar Page -->
+      <div class="step active" id="siloStep1">
+        <div class="step-left">
+          <div class="step-circle">1</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-right">
+          <div class="step-header" onclick="editSiloStep(1)">
+            <div class="step-title">Pillar page</div>
+            <span class="step-edit-btn">Edit</span>
+          </div>
+          <div class="step-summary" id="siloSummary1"></div>
+          <div class="step-content">
+            <div class="step-subtitle">Define your silo's hub page — the pillar all child posts will link back to.</div>
+
+            <div class="field">
+              <label>Pillar Title</label>
+              <input type="text" id="pillarTitle" placeholder="e.g. The Complete Guide to Organic Gardening">
+            </div>
+
+            <div class="field">
+              <label>Pillar Slug <span class="label-hint">— URL-safe, hyphens only</span></label>
+              <div style="display:flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);transition:border-color 0.15s;" id="pillarSlugWrap">
+                <span style="padding:10px 10px 10px 12px;font-size:13px;color:var(--muted);font-family:var(--mono);white-space:nowrap;border-right:1px solid var(--border);background:var(--bg);">/</span>
+                <input type="text" id="pillarSlug" placeholder="organic-gardening" oninput="onPillarSlugInput()"
+                  style="border:none;border-radius:0;box-shadow:none;flex:1;font-family:var(--mono);font-size:13px;"
+                  onfocus="document.getElementById('pillarSlugWrap').style.borderColor='var(--border-focus)'"
+                  onblur="document.getElementById('pillarSlugWrap').style.borderColor='var(--border)';sanitizePillarSlug()">
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <label>Primary Keyword</label>
+                <input type="text" id="pillarPrimaryKw" placeholder="e.g. organic gardening">
+              </div>
+              <div class="field">
+                <label>Site URL <span class="label-hint">— optional</span></label>
+                <input type="text" id="siloSiteUrl" placeholder="https://example.com">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Secondary Keywords <span class="label-hint">— press Enter or comma to add</span></label>
+              <div class="keyword-tags" id="pillarKwTags" onclick="document.getElementById('pillarKwInput').focus()">
+                <input type="text" class="kw-input" id="pillarKwInput" placeholder="Add secondary keywords...">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Related Silos to Cross-link <span class="label-hint">— optional, press Enter to add</span></label>
+              <div class="keyword-tags" id="crossSiloTags" onclick="document.getElementById('crossSiloInput').focus()">
+                <input type="text" class="kw-input" id="crossSiloInput" placeholder="e.g. /composting/ or Composting Guide...">
+              </div>
+            </div>
+
+            <div class="step-nav">
+              <button class="btn btn-primary" onclick="completeSiloStep1()">Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SILO STEP 2: Child Posts -->
+      <div class="step" id="siloStep2">
+        <div class="step-left">
+          <div class="step-circle">2</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-right">
+          <div class="step-header" onclick="editSiloStep(2)">
+            <div class="step-title">Child posts</div>
+            <span class="step-edit-btn">Edit</span>
+          </div>
+          <div class="step-summary" id="siloSummary2"></div>
+          <div class="step-content">
+            <div class="step-subtitle">Add the posts that live under this silo. Each gets its own slug, primary keyword, and optional secondary keywords.</div>
+
+            <div id="childPostsList"></div>
+
+            <button class="btn btn-secondary" onclick="addChildPost()" style="width:100%;margin-top:4px;">
+              + Add Child Post
+            </button>
+
+            <div class="step-nav" style="margin-top:16px;">
+              <button class="btn btn-primary" onclick="completeSiloStep2()">Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SILO STEP 3: Generate Blueprint -->
+      <div class="step" id="siloStep3">
+        <div class="step-left">
+          <div class="step-circle">3</div>
+        </div>
+        <div class="step-right">
+          <div class="step-header">
+            <div class="step-title">Generate silo blueprint</div>
+          </div>
+          <div class="step-content">
+            <div class="step-subtitle">Review your silo structure, then generate a full blueprint with URL map, page outlines, and interlinking strategy.</div>
+            <div id="siloConfigSummary" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:20px;font-size:13px;line-height:2;"></div>
+            <button class="btn btn-primary" onclick="generateSilo()" id="generateSiloBtn" style="font-size:15px;padding:14px;">
+              🏗 Generate Silo Blueprint
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /silo steps-container -->
+
+    <!-- SILO RESULT -->
+    <div class="result-section" id="siloResultSection">
+      <div class="result-card">
+        <div class="result-header">
+          <div class="result-title">Silo Blueprint</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="copySiloBlueprint()">⎘ Copy</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadSiloBlueprint()">⬇ Download</button>
+          </div>
+        </div>
+        <div style="padding:24px;">
+          <pre id="siloBlueprintOutput" style="white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;line-height:1.8;color:#374151;max-height:600px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px;"></pre>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /siloBuilderSection -->
+
+</div><!-- /main -->
 
 <div class="toast" id="toast"></div>
 
@@ -1219,7 +1383,10 @@ function goToStep(n) {
 }
 
 function editStep(n) {
-  if (currentStep > n) goToStep(n);
+  if (currentStep > n) {
+    if (n === 1) { slugManuallyEdited = false; slugUrlManual = false; }
+    goToStep(n);
+  }
 }
 
 function completeStep1() {
@@ -1314,11 +1481,65 @@ function updateWC() {
   document.getElementById('wcHint').textContent = hint;
 }
 
+let slugManuallyEdited = false;
+let slugUrlManual = false;
+
+function kwToSlug(kw) {
+  return kw.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
 function updateFocusKw() {
   const kw = document.getElementById('focusKeyword').value.trim();
-  if (!document.getElementById('targetUrl').value) {
-    document.getElementById('targetUrl').value = kw ? `https://example.com/${kw.toLowerCase().replace(/\s+/g, '-')}/` : '';
+  // Only auto-fill slug if user hasn't manually edited it
+  if (!slugManuallyEdited) {
+    const slug = kwToSlug(kw);
+    document.getElementById('pageSlug').value = slug;
+    updateUrlFromSlug(slug);
   }
+}
+
+function onSlugInput() {
+  slugManuallyEdited = true;
+  const raw = document.getElementById('pageSlug').value;
+  updateUrlFromSlug(raw);
+  showSlugStatus(raw);
+}
+
+function sanitizeSlug() {
+  const el = document.getElementById('pageSlug');
+  const clean = kwToSlug(el.value);
+  el.value = clean;
+  updateUrlFromSlug(clean);
+  showSlugStatus(clean);
+}
+
+function showSlugStatus(slug) {
+  const el = document.getElementById('slugStatus');
+  if (!slug) { el.textContent = ''; return; }
+  const isClean = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(slug);
+  el.textContent = isClean ? '✓ slug-safe' : '⚠ fix slug';
+  el.style.color = isClean ? 'var(--success)' : 'var(--warning)';
+}
+
+function updateUrlFromSlug(slug) {
+  if (slugUrlManual) return; // user typed URL manually, don't overwrite
+  const baseInput = document.getElementById('targetUrl');
+  const existing = baseInput.value;
+  // Extract base domain from existing URL if present
+  const domainMatch = existing.match(/^(https?:\/\/[^/]+)/);
+  const base = domainMatch ? domainMatch[1] : 'https://example.com';
+  baseInput.value = slug ? `${base}/${slug}/` : `${base}/`;
+}
+
+function getSlug() {
+  const manualSlug = document.getElementById('pageSlug').value.trim();
+  if (manualSlug) return manualSlug;
+  const kw = document.getElementById('focusKeyword').value.trim();
+  return kwToSlug(kw);
 }
 
 // ─── CONFIG SUMMARY ───
@@ -1328,13 +1549,15 @@ function buildConfigSummary() {
   const site = document.getElementById('siteName').value || 'My Website';
   const tone = document.getElementById('tone').selectedOptions[0].text;
   const wc = parseInt(document.getElementById('wordCount').value);
-  const url = document.getElementById('targetUrl').value || `https://example.com/${kw.toLowerCase().replace(/\s+/g, '-')}/`;
+  const slug = getSlug() || kw.toLowerCase().replace(/\s+/g, '-');
+  const url = document.getElementById('targetUrl').value || `https://example.com/${slug}/`;
 
   document.getElementById('configSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:13px;">
       <span style="color:var(--muted);">Focus keyword</span><span style="font-weight:500;">${kw}</span>
       <span style="color:var(--muted);">Secondary</span><span>${secKeywords.length ? secKeywords.join(', ') : '—'}</span>
       <span style="color:var(--muted);">Page type</span><span>${type}</span>
+      <span style="color:var(--muted);">Slug</span><span style="font-family:var(--mono);font-size:12px;background:var(--chip-bg);padding:1px 6px;border-radius:4px;">${slug}</span>
       <span style="color:var(--muted);">Site name</span><span>${site}</span>
       <span style="color:var(--muted);">Tone</span><span>${tone}</span>
       <span style="color:var(--muted);">Word count</span><span>${wc.toLocaleString()}+ words</span>
@@ -1404,7 +1627,7 @@ async function generatePage() {
 }
 
 function buildPrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc) {
-  const slug = focusKw.toLowerCase().replace(/\s+/g,'-');
+  const slug = getSlug();
   const title = pageTitle || (focusKw + ' | ' + siteName);
   const secList = secKws.length ? secKws.join(', ') : 'none specified';
   const schemaList = schemas.join(', ');
@@ -1687,6 +1910,468 @@ function showToast(type, msg) {
   t.className = `toast ${type} show`;
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════════════
+// SILO BUILDER
+// ═══════════════════════════════════════════════════════
+
+let currentMode = 'page';
+let currentSiloStep = 1;
+let pillarSecKws = [];
+let crossSilos = [];
+let childPosts = [];
+let siloBlueprint = '';
+
+// ─── MODE SWITCHER ───
+function switchMode(mode) {
+  currentMode = mode;
+  const pageBtn = document.getElementById('modePageBtn');
+  const siloBtn = document.getElementById('modeSiloBtn');
+  const pageSection = document.getElementById('pageBuilderSection');
+  const siloSection = document.getElementById('siloBuilderSection');
+  const heroTitle = document.getElementById('heroTitle');
+  const heroSub = document.getElementById('heroSub');
+
+  if (mode === 'silo') {
+    pageBtn.style.background = 'transparent';
+    pageBtn.style.color = 'var(--muted)';
+    siloBtn.style.background = '#111';
+    siloBtn.style.color = '#fff';
+    pageSection.style.display = 'none';
+    siloSection.style.display = 'block';
+    heroTitle.innerHTML = 'Silo structure &amp;<br>interlinking blueprint.';
+    heroSub.textContent = 'Plan your full content silo — pillar page, child posts, slug-safe URLs, and a complete internal linking strategy.';
+  } else {
+    pageBtn.style.background = '#111';
+    pageBtn.style.color = '#fff';
+    siloBtn.style.background = 'transparent';
+    siloBtn.style.color = 'var(--muted)';
+    pageSection.style.display = 'block';
+    siloSection.style.display = 'none';
+    heroTitle.innerHTML = 'SEO-optimized pages,<br>in seconds.';
+    heroSub.textContent = 'Generate WordPress-ready HTML with full SEO optimization — schema markup, meta tags, and 20-point SEO scoring.';
+  }
+}
+
+// ─── SILO STEP MANAGEMENT ───
+function goToSiloStep(n) {
+  document.querySelectorAll('#siloBuilderSection .step').forEach((el, i) => {
+    const num = i + 1;
+    el.classList.remove('active', 'done');
+    if (num < n) el.classList.add('done');
+    if (num === n) el.classList.add('active');
+  });
+  currentSiloStep = n;
+  if (n === 3) buildSiloConfigSummary();
+}
+
+function editSiloStep(n) {
+  if (currentSiloStep > n) goToSiloStep(n);
+}
+
+// ─── SILO STEP 1 ───
+function completeSiloStep1() {
+  const title = document.getElementById('pillarTitle').value.trim();
+  const slug = document.getElementById('pillarSlug').value.trim();
+  if (!title) { showToast('error', 'Please enter a Pillar Title'); return; }
+  if (!slug)  { showToast('error', 'Please enter a Pillar Slug');  return; }
+  document.getElementById('siloSummary1').textContent = `"${title}" → /${slug}/`;
+  goToSiloStep(2);
+  if (childPosts.length === 0) addChildPost();
+}
+
+// ─── PILLAR SLUG HELPERS ───
+function onPillarSlugInput() {
+  // just live-sanitize display
+}
+function sanitizePillarSlug() {
+  const el = document.getElementById('pillarSlug');
+  el.value = toSlug(el.value);
+}
+
+// ─── SILO STEP 2: CHILD POSTS ───
+function addChildPost() {
+  const idx = childPosts.length;
+  childPosts.push({ title: '', slug: '', primaryKw: '', secondaryKws: [] });
+  renderChildPosts();
+  // focus the new title field
+  setTimeout(() => {
+    const el = document.getElementById(`cp_title_${idx}`);
+    if (el) el.focus();
+  }, 50);
+}
+
+function removeChildPost(idx) {
+  childPosts.splice(idx, 1);
+  renderChildPosts();
+}
+
+function renderChildPosts() {
+  const container = document.getElementById('childPostsList');
+  if (childPosts.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = childPosts.map((cp, i) => `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:600;color:var(--muted);font-family:var(--mono);">POST ${i+1}</span>
+        <button onclick="removeChildPost(${i})" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;transition:color 0.1s;" onmouseover="this.style.color='var(--error)'" onmouseout="this.style.color='var(--muted)'">✕ Remove</button>
+      </div>
+      <div class="field">
+        <label style="font-size:12px;">Post Title</label>
+        <input type="text" id="cp_title_${i}" value="${escHtml(cp.title)}" placeholder="e.g. Best Companion Plants for Tomatoes"
+          oninput="updateChildPost(${i},'title',this.value);autoFillChildSlug(${i})">
+      </div>
+      <div class="field">
+        <label style="font-size:12px;">Post Slug <span class="label-hint">— edit freely, used exactly as given</span></label>
+        <div style="display:flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);" id="cpSlugWrap_${i}">
+          <span style="padding:8px 8px 8px 10px;font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap;border-right:1px solid var(--border);background:var(--bg);">/${document.getElementById('pillarSlug')?.value||'pillar'}/</span>
+          <input type="text" id="cp_slug_${i}" value="${escHtml(cp.slug)}" placeholder="companion-plants-tomatoes"
+            style="border:none;border-radius:0;box-shadow:none;flex:1;font-family:var(--mono);font-size:12px;padding:8px 10px;"
+            oninput="updateChildPost(${i},'slug',this.value)"
+            onblur="sanitizeChildSlug(${i})">
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label style="font-size:12px;">Primary Keyword</label>
+          <input type="text" id="cp_pkw_${i}" value="${escHtml(cp.primaryKw)}" placeholder="companion planting tomatoes"
+            oninput="updateChildPost(${i},'primaryKw',this.value)">
+        </div>
+        <div class="field">
+          <label style="font-size:12px;">Secondary Keywords <span class="label-hint">— comma separated</span></label>
+          <input type="text" id="cp_skw_${i}" value="${cp.secondaryKws.join(', ')}" placeholder="tomato companions, garden planting"
+            oninput="updateChildPost(${i},'secondaryKwsRaw',this.value)">
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateChildPost(idx, field, val) {
+  if (!childPosts[idx]) return;
+  if (field === 'secondaryKwsRaw') {
+    childPosts[idx].secondaryKws = val.split(',').map(s=>s.trim()).filter(Boolean);
+  } else {
+    childPosts[idx][field] = val;
+  }
+}
+
+function autoFillChildSlug(idx) {
+  const titleVal = document.getElementById(`cp_title_${idx}`).value;
+  const slugEl = document.getElementById(`cp_slug_${idx}`);
+  // Only auto-fill if slug is still empty
+  if (!slugEl.value) {
+    slugEl.value = toSlug(titleVal);
+    childPosts[idx].slug = slugEl.value;
+  }
+}
+
+function sanitizeChildSlug(idx) {
+  const el = document.getElementById(`cp_slug_${idx}`);
+  if (!el) return;
+  const clean = toSlug(el.value);
+  el.value = clean;
+  childPosts[idx].slug = clean;
+}
+
+function completeSiloStep2() {
+  // Read current field values into childPosts state
+  childPosts.forEach((cp, i) => {
+    const t = document.getElementById(`cp_title_${i}`);
+    const s = document.getElementById(`cp_slug_${i}`);
+    const p = document.getElementById(`cp_pkw_${i}`);
+    const sk = document.getElementById(`cp_skw_${i}`);
+    if (t) cp.title = t.value.trim();
+    if (s) cp.slug = toSlug(s.value.trim());
+    if (p) cp.primaryKw = p.value.trim();
+    if (sk) cp.secondaryKws = sk.value.split(',').map(x=>x.trim()).filter(Boolean);
+  });
+
+  const valid = childPosts.filter(cp => cp.title && cp.slug);
+  if (valid.length === 0) { showToast('error', 'Add at least one child post with a title and slug'); return; }
+
+  document.getElementById('siloSummary2').textContent = `${valid.length} post${valid.length>1?'s':''}: ${valid.map(cp=>cp.slug).join(', ')}`;
+  goToSiloStep(3);
+}
+
+// ─── SILO CONFIG SUMMARY ───
+function buildSiloConfigSummary() {
+  const pillarTitle = document.getElementById('pillarTitle').value.trim();
+  const pillarSlug  = document.getElementById('pillarSlug').value.trim();
+  const pillarPKw   = document.getElementById('pillarPrimaryKw').value.trim();
+  const siteUrl     = document.getElementById('siloSiteUrl').value.trim() || '/';
+  const validPosts  = childPosts.filter(cp => cp.title && cp.slug);
+
+  const rows = validPosts.map(cp =>
+    `<span style="color:var(--muted);">  └ post</span><span style="font-family:var(--mono);font-size:11px;">${cp.slug} — "${cp.title}"</span>`
+  ).join('');
+
+  document.getElementById('siloConfigSummary').innerHTML = `
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:13px;">
+      <span style="color:var(--muted);">Pillar</span><span style="font-weight:500;">${pillarTitle}</span>
+      <span style="color:var(--muted);">Pillar slug</span><span style="font-family:var(--mono);font-size:12px;background:var(--chip-bg);padding:1px 6px;border-radius:4px;">/${pillarSlug}/</span>
+      <span style="color:var(--muted);">Primary keyword</span><span>${pillarPKw||'—'}</span>
+      <span style="color:var(--muted);">Secondary kws</span><span>${pillarSecKws.length ? pillarSecKws.join(', ') : '—'}</span>
+      <span style="color:var(--muted);">Site URL</span><span style="font-family:var(--mono);font-size:11px;">${siteUrl}</span>
+      <span style="color:var(--muted);">Child posts</span><span>${validPosts.length}</span>
+      ${rows}
+      ${crossSilos.length ? `<span style="color:var(--muted);">Cross-silos</span><span>${crossSilos.join(', ')}</span>` : ''}
+    </div>
+  `;
+}
+
+// ─── PILLAR SECONDARY KW TAGS ───
+document.addEventListener('DOMContentLoaded', () => {
+  // pillar secondary kw tags
+  const pInput = document.getElementById('pillarKwInput');
+  if (pInput) {
+    pInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = pInput.value.replace(/,$/, '').trim();
+        if (val && !pillarSecKws.includes(val)) {
+          pillarSecKws.push(val);
+          renderPillarKwTags();
+        }
+        pInput.value = '';
+      }
+      if (e.key === 'Backspace' && !pInput.value && pillarSecKws.length) {
+        pillarSecKws.pop();
+        renderPillarKwTags();
+      }
+    });
+  }
+
+  // cross-silo tags
+  const csInput = document.getElementById('crossSiloInput');
+  if (csInput) {
+    csInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = csInput.value.replace(/,$/, '').trim();
+        if (val && !crossSilos.includes(val)) {
+          crossSilos.push(val);
+          renderCrossSiloTags();
+        }
+        csInput.value = '';
+      }
+      if (e.key === 'Backspace' && !csInput.value && crossSilos.length) {
+        crossSilos.pop();
+        renderCrossSiloTags();
+      }
+    });
+  }
+});
+
+function renderPillarKwTags() {
+  const container = document.getElementById('pillarKwTags');
+  const input = document.getElementById('pillarKwInput');
+  container.innerHTML = '';
+  pillarSecKws.forEach((kw, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'kw-tag';
+    tag.innerHTML = `${kw}<span class="kw-tag-remove" onclick="removePillarKw(${i})">×</span>`;
+    container.appendChild(tag);
+  });
+  container.appendChild(input);
+}
+
+function removePillarKw(i) {
+  pillarSecKws.splice(i, 1);
+  renderPillarKwTags();
+}
+
+function renderCrossSiloTags() {
+  const container = document.getElementById('crossSiloTags');
+  const input = document.getElementById('crossSiloInput');
+  container.innerHTML = '';
+  crossSilos.forEach((s, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'kw-tag';
+    tag.innerHTML = `${s}<span class="kw-tag-remove" onclick="removeCrossSilo(${i})">×</span>`;
+    container.appendChild(tag);
+  });
+  container.appendChild(input);
+}
+
+function removeCrossSilo(i) {
+  crossSilos.splice(i, 1);
+  renderCrossSiloTags();
+}
+
+// ─── SHARED SLUG UTILITY ───
+function toSlug(str) {
+  return String(str).toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+// ─── GENERATE SILO BLUEPRINT ───
+async function generateSilo() {
+  const pillarTitle = document.getElementById('pillarTitle').value.trim();
+  const pillarSlug  = document.getElementById('pillarSlug').value.trim();
+  const pillarPKw   = document.getElementById('pillarPrimaryKw').value.trim();
+  const siteUrl     = document.getElementById('siloSiteUrl').value.trim();
+  const validPosts  = childPosts.filter(cp => cp.title && cp.slug);
+
+  if (!pillarTitle || !pillarSlug) { showToast('error', 'Complete pillar details first'); return; }
+  if (validPosts.length === 0) { showToast('error', 'Add at least one child post'); return; }
+
+  document.getElementById('generateSiloBtn').disabled = true;
+  document.getElementById('generateSiloBtn').textContent = '⏳ Generating...';
+
+  const prompt = buildSiloPrompt(pillarTitle, pillarSlug, pillarPKw, pillarSecKws, validPosts, siteUrl, crossSilos);
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, wordCount: 3000 }),
+    });
+
+    if (!res.ok) {
+      let msg = `Server error ${res.status}`;
+      try { const d = await res.json(); msg = d.error || msg; } catch(e) {}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    const text = (data.html || data.text || data.content || '').trim();
+    if (!text) throw new Error('Empty response from server.');
+
+    siloBlueprint = text;
+    document.getElementById('siloBlueprintOutput').textContent = text;
+    document.getElementById('siloResultSection').classList.add('visible');
+    setTimeout(() => {
+      document.getElementById('siloResultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+    showToast('success', 'Blueprint generated!');
+
+  } catch(err) {
+    showToast('error', err.message);
+    console.error(err);
+  } finally {
+    document.getElementById('generateSiloBtn').disabled = false;
+    document.getElementById('generateSiloBtn').textContent = '🏗 Generate Silo Blueprint';
+  }
+}
+
+// ─── SILO PROMPT BUILDER ───
+function buildSiloPrompt(pillarTitle, pillarSlug, pillarPKw, pillarSecKws, posts, siteUrl, crossSilos) {
+  const secKwStr = pillarSecKws.length ? pillarSecKws.join(', ') : 'none specified';
+  const siteStr  = siteUrl || 'none provided';
+
+  const postsBlock = posts.map((cp, i) => {
+    const skStr = cp.secondaryKws && cp.secondaryKws.length ? cp.secondaryKws.join(', ') : 'none specified';
+    return `- Post Title: ${cp.title}
+  Post Slug: ${cp.slug}
+  Primary Keyword: ${cp.primaryKw || 'not specified'}
+  Secondary Keywords: ${skStr}`;
+  }).join('\n\n');
+
+  const crossStr = crossSilos.length
+    ? `Existing related silos to cross-link: ${crossSilos.join(', ')}`
+    : 'No existing cross-silos specified.';
+
+  return `You are a senior SEO strategist and content architect.
+
+INPUTS CONFIRMED — interpret these exactly as given, do not alter any slugs:
+
+SILO PILLAR
+- Pillar Title: ${pillarTitle}
+- Pillar Slug: ${pillarSlug}
+- Primary Keyword: ${pillarPKw || 'not specified'}
+- Secondary Keywords: ${secKwStr}
+
+CHILD POSTS LIST
+${postsBlock}
+
+OPTIONAL
+- Site URL: ${siteStr}
+- ${crossStr}
+
+HARD RULES
+- Use the provided slugs EXACTLY as given. Do not rewrite, pluralize, change capitalization, or alter hyphens.
+- Build a silo where every child post links back to the pillar using a consistent contextual anchor.
+- The pillar must link out to every child post in a structured section.
+- Add lateral links between child posts only when the topic relationship is strong and natural — do not force it.
+- Avoid orphan pages — every page must have at least 1 link to parent pillar and 1 link from the pillar to it.
+- Keep anchors varied but accurate. Avoid repeating the exact same anchor text everywhere.
+
+First, restate the inputs you received so the user can confirm titles and slugs were interpreted correctly.
+
+Then produce ALL of the following sections in this exact order:
+
+A. URL MAP
+Show the full URL structure using the provided slugs.
+Format:
+  Pillar: /pillar-slug/
+  Child: /pillar-slug/post-slug/
+If a site URL was provided, show full URLs.
+
+B. NAVIGATION AND SILO RELATIONSHIPS
+Describe the intended hierarchy in plain language.
+Include a short note on breadcrumbs and how users move pillar → post → pillar.
+
+C. PILLAR PAGE BLUEPRINT
+- SEO title tag: 3 variations
+- Meta description: 2 variations
+- H1
+- H2/H3 outline with notes on what each section covers
+- "In This Silo" section listing all child posts with:
+  - Link URL
+  - Recommended anchor text
+  - One sentence teaser
+- FAQ block: 6–10 FAQs that support the pillar and naturally reference child posts
+- Internal link placements: for each child post, list every placement on the pillar with recommended anchor text
+
+D. CHILD POST BLUEPRINTS
+For each child post:
+- SEO title tag: 2 variations
+- Meta description: 1 variation
+- H1
+- H2/H3 outline
+- Mandatory internal links:
+  - Link back to pillar (exact URL, 2 anchor options, best placement)
+  - 1–3 lateral links to sibling posts only if strongly relevant (URL, why relevant, anchor suggestions)
+- CTA suggestion (simple, non-spammy)
+
+E. INTERLINKING STRATEGY TABLE
+Columns: From Page | To Page | Link Type (parent/child/lateral) | Recommended Anchor | Placement Location
+
+F. BUILD CHECKLIST
+Bullet list of implementation steps including:
+- Add pillar hub section
+- Add breadcrumb logic
+- Ensure each child includes parent link
+- Add suggested lateral links only where relevant
+- Add FAQ schema recommendation if appropriate`;
+}
+
+// ─── SILO COPY / DOWNLOAD ───
+function copySiloBlueprint() {
+  if (!siloBlueprint) return;
+  navigator.clipboard.writeText(siloBlueprint).then(() => showToast('success', 'Blueprint copied!'));
+}
+
+function downloadSiloBlueprint() {
+  if (!siloBlueprint) return;
+  const slug = document.getElementById('pillarSlug').value.trim() || 'silo';
+  const blob = new Blob([siloBlueprint], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${slug}-silo-blueprint.txt`;
+  a.click();
+  showToast('success', 'Downloaded!');
 }
 </script>
 </body>
