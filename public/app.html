@@ -860,6 +860,38 @@
   .step:last-child .step-line {
     display: none;
   }
+
+  /* ─── DIVI TOGGLE ─── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.15s;
+  }
+  .toggle-row:hover { border-color: var(--border-focus); }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .toggle-desc  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .toggle-track {
+    width: 40px; height: 22px; border-radius: 99px;
+    background: var(--border); position: relative;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-track.on { background: #111; }
+  .toggle-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: white; position: absolute;
+    top: 2px; left: 2px;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+  .toggle-track.on .toggle-thumb { left: 20px; }
 </style>
 </head>
 <body>
@@ -1085,8 +1117,24 @@
 
           <div class="field">
             <label>Brand Colors <span class="label-hint">— Claude will apply these to headings &amp; CTA box CSS</span></label>
-            <textarea id="pageBrandColors" rows="2" placeholder="e.g. #1d4ed8 and #f59e0b&#10;or: dark navy headings, gold CTA button&#10;or: https://example.com (Claude will match your site colors)"></textarea>
-            <div class="hint-text">Paste hex codes, describe your colors, or drop in your site URL. Leave blank for default styling.</div>
+            <div id="pageBrandColorsWrap">
+              <textarea id="pageBrandColors" rows="3" placeholder="Examples:&#10;H1: #1d4ed8, H2: #374151, H3: #6b7280, CTA: #f59e0b&#10;H1 dark navy, H2 slate, H3 light grey, CTA gold&#10;https://example.com — or just: forest green and cream"></textarea>
+              <div class="hint-text">Specify per heading level or describe overall brand colors. Leave blank for default styling.</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Theme CSS Control</label>
+            <div class="toggle-row" onclick="toggleDivi('page')">
+              <div>
+                <div class="toggle-label">Let Divi control all CSS</div>
+                <div class="toggle-desc">Strips all inline styles — Divi's theme builder handles heading colors, fonts, and spacing</div>
+              </div>
+              <div class="toggle-track" id="pageDiviTrack">
+                <div class="toggle-thumb" id="pageDiviThumb"></div>
+              </div>
+            </div>
+            <div class="hint-text" id="pageDiviHint">Off — generated page includes its own scoped CSS.</div>
           </div>
           <div class="step-nav">
             <button class="btn btn-primary" onclick="completeStep2()">Continue →</button>
@@ -1261,8 +1309,24 @@
 
             <div class="field">
               <label>Brand Colors <span class="label-hint">— Claude will apply these to headings &amp; CTA box across all silo pages</span></label>
-              <textarea id="siloBrandColors" rows="2" placeholder="e.g. #166534 and #f59e0b&#10;or: forest green headings, warm gold CTA&#10;or: https://gardenwiseguy.com (Claude will match your site colors)"></textarea>
-              <div class="hint-text">Paste hex codes, describe your colors, or drop in your site URL. Leave blank for default styling.</div>
+              <div id="siloBrandColorsWrap">
+                <textarea id="siloBrandColors" rows="3" placeholder="Examples:&#10;H1: #1d4ed8, H2: #374151, H3: #6b7280, CTA: #f59e0b&#10;H1 dark navy, H2 slate, H3 light grey, CTA gold&#10;https://gardenwiseguy.com — or just: forest green and cream"></textarea>
+                <div class="hint-text">Specify per heading level or describe overall brand colors. Leave blank for default styling.</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Theme CSS Control</label>
+              <div class="toggle-row" onclick="toggleDivi('silo')">
+                <div>
+                  <div class="toggle-label">Let Divi control all CSS</div>
+                  <div class="toggle-desc">Strips all inline styles — Divi's theme builder handles heading colors, fonts, and spacing</div>
+                </div>
+                <div class="toggle-track" id="siloDiviTrack">
+                  <div class="toggle-thumb" id="siloDiviThumb"></div>
+                </div>
+              </div>
+              <div class="hint-text" id="siloDiviHint">Off — generated pages include their own scoped CSS.</div>
             </div>
 
             <div class="step-nav">
@@ -1670,10 +1734,11 @@ async function generatePage() {
 
     if (!html || html.length < 200) throw new Error('Could not extract content. Try again.');
 
+    if (pageDiviMode) html = stripInlineStyles(html);
     generatedHTML = html;
     stopLoading();
     renderResult(html, focusKw, targetUrl);
-    showToast('success', 'Page generated!');
+    showToast('success', pageDiviMode ? 'Page generated — Divi CSS stripped!' : 'Page generated!');
 
   } catch(err) {
     stopLoading();
@@ -1688,16 +1753,36 @@ function buildPrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pa
   const secList = secKws.length ? secKws.join(', ') : 'none specified';
   const schemaList = schemas.join(', ');
   const brandColorInstruction = brandColors
-    ? `BRAND COLORS — interpret the following and apply to the CSS:
+    ? `BRAND COLORS — read the following carefully and apply each instruction to the CSS:
 "${brandColors}"
-- If hex codes are given (e.g. #1d4ed8), use them exactly
-- If colors are described (e.g. "dark navy, gold"), choose the closest appropriate hex values
-- If a URL is given, infer brand colors from the domain/brand name
-- Apply the primary brand color to ALL h1, h2, h3 elements
-- Apply the secondary/accent color as the CTA box background
-- Auto-set CTA text to white or black based on contrast
-- If only one color is given, use it for headings and derive a complementary CTA color`
+Rules for interpreting:
+- If specific heading levels are mentioned (e.g. "H1: #1d4ed8, H2: #374151"), apply each color ONLY to that heading level
+- If hex codes are given, use them exactly as provided
+- If colors are described in words (e.g. "dark navy", "forest green"), choose the closest appropriate hex value
+- If a URL is given, infer the brand colors from the domain or brand identity
+- If "CTA" or "CTA box" is mentioned, apply that color as the CTA box background with auto-contrasting text (white or black)
+- If only one color is given with no tag specified, apply it to all headings and derive a complementary CTA color
+- If H1/H2/H3 are specified separately, give each its own color rule in the CSS — do not group them
+- Always ensure text contrast is accessible (WCAG AA minimum)`
     : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
+
+  const diviMode = typeof pageDiviMode !== 'undefined' && pageDiviMode;
+  const stylingInstruction = diviMode
+    ? `STYLING — DIVI MODE:
+- DO NOT include any <style> blocks whatsoever
+- DO NOT add inline style="" attributes on any element
+- DO NOT include any <script> blocks for FAQ accordion
+- Output clean semantic HTML only — headings, paragraphs, lists, divs with class names only
+- Use descriptive Divi-friendly class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
+- Divi's theme builder controls all colors, fonts, spacing, and layout
+- CTA box: plain <div class="wp-seo-cta"><p>...</p></div> — no background, no inline styles`
+    : `STYLING:
+- <style> block with .wp-seo- prefixed CSS
+- ${brandColorInstruction}
+- The page MUST include a styled CTA box near the bottom
+- Clean, professional, WordPress-theme-compatible
+- FAQ accordion with vanilla JS <script> at bottom
+- Mobile responsive with media queries`;
 
   return `You are an expert SEO content writer and WordPress developer. Generate WORDPRESS BODY CONTENT ONLY — no full HTML page, no <html>, no <head>, no header, no nav, no footer.
 
@@ -1757,13 +1842,7 @@ SECTION 3 — PAGE BODY CONTENT:
 - FAQ section with 5+ Q&As
 - DO NOT include header/nav/footer/breadcrumb UI/sidebar
 
-STYLING:
-- <style> block with .wp-seo- prefixed CSS
-- ${brandColorInstruction}
-- The page MUST include a styled CTA box near the bottom
-- Clean, professional, WordPress-theme-compatible
-- FAQ accordion with vanilla JS <script> at bottom
-- Mobile responsive with media queries`;
+${stylingInstruction}`;
 }
 
 // ─── LOADING ───
@@ -2190,6 +2269,7 @@ function buildSiloConfigSummary() {
       <span style="color:var(--muted);">Secondary kws</span><span>${pillarSecKws.length ? pillarSecKws.join(', ') : '—'}</span>
       <span style="color:var(--muted);">Words per page</span><span>${getSiloWordCount().toLocaleString()} words</span>
       ${document.getElementById('siloBrandColors')?.value.trim() ? `<span style="color:var(--muted);">Brand colors</span><span style="font-style:italic;color:var(--text);">${document.getElementById('siloBrandColors').value.trim().slice(0,60)}${document.getElementById('siloBrandColors').value.trim().length > 60 ? '…' : ''}</span>` : ''}
+      ${siloDiviMode ? `<span style="color:var(--muted);">Theme CSS</span><span style="font-weight:600;">Divi mode — inline styles stripped</span>` : ''}
       <span style="color:var(--muted);">Site URL</span><span style="font-family:var(--mono);font-size:11px;">${siteUrl}</span>
       <span style="color:var(--muted);">Child posts</span><span>${validPosts.length}</span>
       ${rows}
@@ -2303,7 +2383,40 @@ function getSiloWordCount() {
   return el ? parseInt(el.value) || 1500 : 1500;
 }
 
-// ─── GENERATE SILO BLUEPRINT ───
+// ─── DIVI MODE ───
+let pageDiviMode = false;
+let siloDiviMode = false;
+
+function toggleDivi(mode) {
+  if (mode === 'page') {
+    pageDiviMode = !pageDiviMode;
+    document.getElementById('pageDiviTrack').classList.toggle('on', pageDiviMode);
+    document.getElementById('pageBrandColorsWrap').style.opacity = pageDiviMode ? '0.4' : '1';
+    document.getElementById('pageBrandColorsWrap').style.pointerEvents = pageDiviMode ? 'none' : '';
+    document.getElementById('pageDiviHint').textContent = pageDiviMode
+      ? '✓ On — all inline <style> blocks will be stripped. Divi controls the design.'
+      : 'Off — generated page includes its own scoped CSS.';
+  } else {
+    siloDiviMode = !siloDiviMode;
+    document.getElementById('siloDiviTrack').classList.toggle('on', siloDiviMode);
+    document.getElementById('siloBrandColorsWrap').style.opacity = siloDiviMode ? '0.4' : '1';
+    document.getElementById('siloBrandColorsWrap').style.pointerEvents = siloDiviMode ? 'none' : '';
+    document.getElementById('siloDiviHint').textContent = siloDiviMode
+      ? '✓ On — all inline <style> blocks will be stripped from every page. Divi controls the design.'
+      : 'Off — generated pages include their own scoped CSS.';
+  }
+}
+
+// Strip all <style> blocks and inline style="" attributes from generated HTML
+function stripInlineStyles(html) {
+  // Remove <style>...</style> blocks (including multi-line)
+  html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
+  // Remove inline style attributes from all tags
+  html = html.replace(/\s+style\s*=\s*["'][^"']*["']/gi, '');
+  // Remove any leftover empty style attributes
+  html = html.replace(/\s+style\s*=\s*[""]["']/gi, '');
+  return html.trim();
+}
 async function generateSilo() {
   const pillarTitle = document.getElementById('pillarTitle').value.trim();
   const pillarSlug  = document.getElementById('pillarSlug').value.trim();
@@ -2593,6 +2706,7 @@ async function buildSiloPages() {
         else html = html.replace(/<head[\s\S]*?<\/head>/i,'').replace(/<\/?(?:html|body|head)[^>]*>/gi,'').trim();
       }
 
+      if (siloDiviMode) html = stripInlineStyles(html);
       const wordCount = html.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
       const fullPage = wrapSiloPageShell(pg.label, pg.url, html);
       builtPages.push({ filename: pg.slug + '.html', content: fullPage, label: pg.label });
@@ -2695,16 +2809,36 @@ function buildSiloPagePrompt(focusKw, secKws, pageType, siteName, url, tone, sch
   const secList = secKws.length ? secKws.join(', ') : 'none specified';
   const schemaList = schemas.join(', ');
   const brandColorInstruction = colors
-    ? `BRAND COLORS — interpret the following and apply to the CSS:
+    ? `BRAND COLORS — read the following carefully and apply each instruction to the CSS:
 "${colors}"
-- If hex codes are given (e.g. #1d4ed8), use them exactly
-- If colors are described (e.g. "dark navy, gold"), choose the closest appropriate hex values
-- If a URL is given, infer brand colors from the domain/brand name
-- Apply the primary brand color to ALL h1, h2, h3 elements
-- Apply the secondary/accent color as the CTA box background
-- Auto-set CTA text to white or black based on contrast
-- If only one color is given, use it for headings and derive a complementary CTA color`
+Rules for interpreting:
+- If specific heading levels are mentioned (e.g. "H1: #1d4ed8, H2: #374151"), apply each color ONLY to that heading level
+- If hex codes are given, use them exactly as provided
+- If colors are described in words (e.g. "dark navy", "forest green"), choose the closest appropriate hex value
+- If a URL is given, infer the brand colors from the domain or brand identity
+- If "CTA" or "CTA box" is mentioned, apply that color as the CTA box background with auto-contrasting text (white or black)
+- If only one color is given with no tag specified, apply it to all headings and derive a complementary CTA color
+- If H1/H2/H3 are specified separately, give each its own color rule in the CSS — do not group them
+- Always ensure text contrast is accessible (WCAG AA minimum)`
     : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
+
+  const diviMode = typeof siloDiviMode !== 'undefined' && siloDiviMode;
+  const stylingInstruction = diviMode
+    ? `STYLING — DIVI MODE:
+- DO NOT include any <style> blocks whatsoever
+- DO NOT add inline style="" attributes on any element
+- DO NOT include any <script> blocks for FAQ accordion
+- Output clean semantic HTML only — headings, paragraphs, lists, divs with class names only
+- Use descriptive Divi-friendly class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
+- Divi's theme builder controls all colors, fonts, spacing, and layout
+- CTA box: plain <div class="wp-seo-cta"><p>...</p></div> — no background, no inline styles`
+    : `STYLING:
+- <style> block with .wp-seo- prefixed CSS
+- ${brandColorInstruction}
+- The page MUST include a styled CTA box near the bottom
+- Clean, professional, WordPress-theme-compatible
+- FAQ accordion with vanilla JS <script> at bottom
+- Mobile responsive with media queries`;
 
   const linkBlock = internalLinks.length
     ? `REQUIRED INTERNAL LINKS — embed ALL of these as natural contextual anchor links within the body copy:
@@ -2776,13 +2910,7 @@ SECTION 3 — PAGE BODY CONTENT:
 - FAQ section with 5+ Q&As
 - DO NOT include header/nav/footer/breadcrumb UI/sidebar
 
-STYLING:
-- <style> block with .wp-seo- prefixed CSS
-- ${brandColorInstruction}
-- The page MUST include a styled CTA box near the bottom
-- Clean, professional, WordPress-theme-compatible
-- FAQ accordion with vanilla JS <script> at bottom
-- Mobile responsive with media queries`;
+${stylingInstruction}`;
 }
 </script>
 </body>
