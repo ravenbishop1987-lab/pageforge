@@ -106,7 +106,7 @@ router.post('/checkout', async (req, res) => {
     const sessionConfig = {
       mode: plan === 'monthly' ? 'subscription' : 'payment',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.APP_URL}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL}/?cancelled=true`,
       metadata: { plan },
       allow_promotion_codes: true,
