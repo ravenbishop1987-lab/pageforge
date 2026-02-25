@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PageForge — AI SEO Page Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1302,11 +1303,40 @@
           <div class="result-title">Silo Blueprint</div>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-secondary btn-sm" onclick="copySiloBlueprint()">⎘ Copy</button>
-            <button class="btn btn-secondary btn-sm" onclick="downloadSiloBlueprint()">⬇ Download</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadSiloBlueprint()">⬇ .txt</button>
           </div>
         </div>
-        <div style="padding:24px;">
-          <pre id="siloBlueprintOutput" style="white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;line-height:1.8;color:#374151;max-height:600px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px;"></pre>
+        <div style="padding:24px 24px 0;">
+          <pre id="siloBlueprintOutput" style="white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;line-height:1.8;color:#374151;max-height:500px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px;"></pre>
+        </div>
+
+        <!-- BUILD PAGES PANEL -->
+        <div style="padding:24px;border-top:1px solid var(--border);margin-top:24px;">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Build Page Content</div>
+            <div style="font-size:13px;color:var(--muted);">Generate full WordPress-ready HTML for every page in your silo, then download as a zip.</div>
+          </div>
+
+          <!-- STATUS BAR (hidden until building) -->
+          <div id="buildStatusPanel" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="font-size:13px;font-weight:600;" id="buildStatusTitle">Building pages...</span>
+              <span style="font-size:12px;font-family:var(--mono);color:var(--muted);" id="buildStatusCount">0 / 0</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:12px;">
+              <div id="buildProgressFill" style="height:100%;background:#111;border-radius:99px;width:0%;transition:width 0.4s ease;"></div>
+            </div>
+            <div id="buildPageRows" style="display:flex;flex-direction:column;gap:6px;"></div>
+          </div>
+
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" id="buildPagesBtn" onclick="buildSiloPages()" style="flex:1;font-size:14px;padding:12px;">
+              ⚡ Build All Pages
+            </button>
+            <button class="btn btn-secondary btn-sm" id="downloadZipBtn" onclick="downloadSiloZip()" style="display:none;padding:12px 18px;">
+              ⬇ Download Zip
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2357,7 +2387,7 @@ Bullet list of implementation steps including:
 - Add FAQ schema recommendation if appropriate`;
 }
 
-// ─── SILO COPY / DOWNLOAD ───
+// ─── SILO COPY / DOWNLOAD BLUEPRINT ───
 function copySiloBlueprint() {
   if (!siloBlueprint) return;
   navigator.clipboard.writeText(siloBlueprint).then(() => showToast('success', 'Blueprint copied!'));
@@ -2372,6 +2402,295 @@ function downloadSiloBlueprint() {
   a.download = `${slug}-silo-blueprint.txt`;
   a.click();
   showToast('success', 'Downloaded!');
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD ALL SILO PAGES
+// ═══════════════════════════════════════════════════════
+
+let siloZip = null;
+let builtPages = [];
+
+async function buildSiloPages() {
+  const pillarTitle = document.getElementById('pillarTitle').value.trim();
+  const pillarSlug  = document.getElementById('pillarSlug').value.trim();
+  const pillarPKw   = document.getElementById('pillarPrimaryKw').value.trim();
+  const siteUrl     = (document.getElementById('siloSiteUrl').value.trim() || 'https://example.com').replace(/\/$/, '');
+  const validPosts  = childPosts.filter(cp => cp.title && cp.slug);
+  const tone        = 'professional';
+  const wc          = 1500;
+
+  if (!pillarTitle || !pillarSlug) { showToast('error', 'Missing pillar details'); return; }
+  if (validPosts.length === 0)     { showToast('error', 'No child posts to build'); return; }
+
+  // Build page queue: pillar first, then children
+  const queue = [
+    {
+      label: pillarTitle,
+      slug: pillarSlug,
+      url: `${siteUrl}/${pillarSlug}/`,
+      focusKw: pillarPKw || pillarTitle,
+      secKws: [...pillarSecKws],
+      pageType: 'pillar',
+      isPillar: true,
+      internalLinks: validPosts.map(cp => ({
+        text: cp.title,
+        url: `${siteUrl}/${pillarSlug}/${cp.slug}/`
+      }))
+    },
+    ...validPosts.map(cp => ({
+      label: cp.title,
+      slug: cp.slug,
+      url: `${siteUrl}/${pillarSlug}/${cp.slug}/`,
+      focusKw: cp.primaryKw || cp.title,
+      secKws: cp.secondaryKws || [],
+      pageType: 'blog',
+      isPillar: false,
+      internalLinks: [
+        { text: pillarTitle, url: `${siteUrl}/${pillarSlug}/` },
+        ...validPosts
+          .filter(other => other.slug !== cp.slug)
+          .slice(0, 2)
+          .map(other => ({ text: other.title, url: `${siteUrl}/${pillarSlug}/${other.slug}/` }))
+      ]
+    }))
+  ];
+
+  const total = queue.length;
+  builtPages = [];
+  siloZip = null;
+
+  // Show status panel, hide zip button
+  document.getElementById('buildStatusPanel').style.display = 'block';
+  document.getElementById('buildPagesBtn').disabled = true;
+  document.getElementById('buildPagesBtn').textContent = '⏳ Building...';
+  document.getElementById('downloadZipBtn').style.display = 'none';
+  document.getElementById('buildStatusTitle').textContent = `Building ${total} page${total > 1 ? 's' : ''}...`;
+  document.getElementById('buildStatusCount').textContent = `0 / ${total}`;
+  document.getElementById('buildProgressFill').style.width = '0%';
+  document.getElementById('buildProgressFill').style.background = '#111';
+
+  // Render all rows as pending
+  document.getElementById('buildPageRows').innerHTML = queue.map((pg, i) =>
+    buildStatusRow(i, pg.label, pg.isPillar ? '📌 Pillar' : `📄 Post ${i}`, 'pending', 'waiting...')
+  ).join('');
+
+  let doneCount = 0;
+
+  for (let i = 0; i < queue.length; i++) {
+    const pg = queue[i];
+    setRowState(i, 'active', 'generating...');
+
+    try {
+      const prompt = buildSiloPagePrompt(
+        pg.focusKw, pg.secKws, pg.pageType,
+        pillarTitle, pg.url, tone,
+        ['Article', 'FAQPage', 'BreadcrumbList'],
+        pg.label, wc, pg.internalLinks,
+        pillarSlug, pg.isPillar
+      );
+
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, wordCount: wc }),
+      });
+
+      if (!res.ok) {
+        let msg = `Server error ${res.status}`;
+        try { const d = await res.json(); msg = d.error || msg; } catch(e) {}
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      let html = (data.html || data.text || data.content || '').trim();
+      if (!html) throw new Error('Empty response');
+
+      // Strip any full-page wrapper if returned
+      const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
+      if (fence) html = fence[1].trim();
+      if (html.toLowerCase().includes('<!doctype')) {
+        const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        if (body) html = body[1].trim();
+        else html = html.replace(/<head[\s\S]*?<\/head>/i,'').replace(/<\/?(?:html|body|head)[^>]*>/gi,'').trim();
+      }
+
+      const wordCount = html.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+      const fullPage = wrapSiloPageShell(pg.label, pg.url, html);
+      builtPages.push({ filename: pg.slug + '.html', content: fullPage, label: pg.label });
+      doneCount++;
+      setRowState(i, 'done', `${wordCount.toLocaleString()} words`);
+
+    } catch(err) {
+      doneCount++;
+      setRowState(i, 'error', err.message.slice(0, 30));
+      console.error(`Failed: ${pg.label}`, err);
+    }
+
+    // Update progress bar
+    const pct = Math.round((doneCount / total) * 100);
+    document.getElementById('buildProgressFill').style.width = pct + '%';
+    document.getElementById('buildStatusCount').textContent = `${doneCount} / ${total}`;
+  }
+
+  // All done
+  const successCount = builtPages.length;
+  const allOk = successCount === total;
+  document.getElementById('buildStatusTitle').textContent =
+    allOk ? `✓ All ${total} pages built successfully` : `⚠ ${successCount} of ${total} pages built`;
+  document.getElementById('buildProgressFill').style.background =
+    allOk ? 'var(--success)' : 'var(--warning)';
+  document.getElementById('buildPagesBtn').disabled = false;
+  document.getElementById('buildPagesBtn').textContent = '⚡ Rebuild All Pages';
+
+  if (successCount > 0) {
+    siloZip = new JSZip();
+    const folder = siloZip.folder(pillarSlug);
+    builtPages.forEach(pg => folder.file(pg.filename, pg.content));
+    if (siloBlueprint) folder.file('_silo-blueprint.txt', siloBlueprint);
+    document.getElementById('downloadZipBtn').style.display = 'inline-flex';
+    showToast('success', `${successCount} pages ready — download zip!`);
+  }
+}
+
+// ─── STATUS ROW HELPERS ───
+function buildStatusRow(i, label, tag, state, note) {
+  const icons  = { pending: '○', active: '◉', done: '✓', error: '✗' };
+  const colors = { pending: 'var(--subtle)', active: 'var(--accent)', done: 'var(--success)', error: 'var(--error)' };
+  return `<div id="buildRow_${i}" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+    <span id="buildRowIcon_${i}" style="font-size:13px;color:${colors[state]};width:14px;text-align:center;flex-shrink:0;">${icons[state]}</span>
+    <span style="flex:1;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>
+    <span style="font-size:11px;color:var(--muted);font-family:var(--mono);flex-shrink:0;">${tag}</span>
+    <span id="buildRowNote_${i}" style="font-size:11px;color:var(--muted);font-family:var(--mono);min-width:90px;text-align:right;flex-shrink:0;">${note}</span>
+  </div>`;
+}
+
+function setRowState(i, state, note) {
+  const icons  = { pending: '○', active: '◉', done: '✓', error: '✗' };
+  const colors = { pending: 'var(--subtle)', active: 'var(--accent)', done: 'var(--success)', error: 'var(--error)' };
+  const iconEl = document.getElementById(`buildRowIcon_${i}`);
+  const noteEl = document.getElementById(`buildRowNote_${i}`);
+  if (iconEl) { iconEl.textContent = icons[state]; iconEl.style.color = colors[state]; }
+  if (noteEl) { noteEl.textContent = note; noteEl.style.color = state === 'error' ? 'var(--error)' : 'var(--muted)'; }
+}
+
+// ─── ZIP DOWNLOAD ───
+async function downloadSiloZip() {
+  if (!siloZip) { showToast('error', 'No pages built yet'); return; }
+  const pillarSlug = document.getElementById('pillarSlug').value.trim() || 'silo';
+  showToast('success', 'Packing zip...');
+  const blob = await siloZip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${pillarSlug}-silo-pages.zip`;
+  a.click();
+  setTimeout(() => showToast('success', 'Zip downloaded!'), 400);
+}
+
+// ─── PAGE HTML SHELL ───
+function wrapSiloPageShell(title, url, bodyContent) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<link rel="canonical" href="${url}">
+<style>
+  body { margin: 0 auto; padding: 32px 40px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 860px; background: #fff; color: #111; line-height: 1.7; }
+  * { box-sizing: border-box; }
+  img { max-width: 100%; height: auto; border-radius: 8px; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+${bodyContent}
+</body>
+</html>`;
+}
+
+// ─── SILO-AWARE PAGE CONTENT PROMPT ───
+function buildSiloPagePrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc, internalLinks, pillarSlug, isPillar) {
+  const slug = url.split('/').filter(Boolean).pop() || toSlug(focusKw);
+  const title = pageTitle || (focusKw + ' | ' + siteName);
+  const secList = secKws.length ? secKws.join(', ') : 'none specified';
+  const schemaList = schemas.join(', ');
+
+  const linkBlock = internalLinks.length
+    ? `REQUIRED INTERNAL LINKS — embed ALL of these as natural contextual anchor links within the body copy:
+${internalLinks.map(l => `  • Anchor text: "${l.text}"  →  href="${l.url}"`).join('\n')}
+
+${isPillar
+  ? 'This is the PILLAR PAGE of this silo. You MUST include a dedicated section titled "In This Guide" or "Explore This Silo" that links out to every child post listed above with a one-sentence teaser each.'
+  : 'This is a CHILD POST inside a content silo. You MUST link back to the pillar page naturally in the body copy — ideally in the intro or a relevant section. This is mandatory for silo architecture.'
+}`
+    : '';
+
+  return `You are an expert SEO content writer and WordPress developer. Generate WORDPRESS BODY CONTENT ONLY — no full HTML page, no <html>, no <head>, no header, no nav, no footer.
+
+INPUTS:
+- Focus Keyword: "${focusKw}"
+- Page Title: "${title}"
+- Secondary Keywords: ${secList}
+- Page Type: ${pageType}
+- Site Name: ${siteName}
+- Target URL: ${url}
+- Tone: ${tone}
+- Target Word Count: ${wc} words minimum (HARD REQUIREMENT)
+- Schema Types: ${schemaList}
+- Silo Root: /${pillarSlug}/
+
+${linkBlock}
+
+OUTPUT FORMAT — WORDPRESS BODY ONLY:
+
+SECTION 1 — SEO META COMMENT:
+<!-- SEO META
+================================================================
+TITLE TAG:
+${title}
+
+META DESCRIPTION:
+[Write 130-155 character description with "${focusKw}" and a CTA]
+
+CANONICAL URL:
+${url}
+
+FOCUS KEYWORD: ${focusKw}
+
+og:title: ${title}
+og:description: [same as META DESCRIPTION]
+og:url: ${url}
+og:type: article
+og:image: https://placehold.co/1200x630?text=${slug}
+
+twitter:card: summary_large_image
+twitter:title: ${title}
+twitter:description: [same as META DESCRIPTION]
+twitter:image: https://placehold.co/1200x630?text=${slug}
+================================================================ -->
+
+SECTION 2 — JSON-LD SCHEMA:
+<script type="application/ld+json"> block with: ${schemaList}
+Include FAQPage with 5+ real Q&As. Include BreadcrumbList (3 levels).
+
+SECTION 3 — PAGE BODY CONTENT:
+- ONE <h1> with focus keyword "${focusKw}"
+- 5+ <h2> subheadings using secondary keywords
+- Multiple <h3> under h2s
+- Keyword "${focusKw}" in first paragraph
+- ${wc}+ words of real, detailed content (NO lorem ipsum)
+- EVERY <img> must have alt="[descriptive]" — NEVER omit alt
+- Use https://placehold.co/800x400?text=${slug} for main image
+- Embed ALL required internal links from the section above naturally in body copy
+- FAQ section with 5+ Q&As
+- DO NOT include header/nav/footer/breadcrumb UI/sidebar
+
+STYLING:
+- <style> block with .wp-seo- prefixed CSS
+- Clean, professional, WordPress-theme-compatible
+- FAQ accordion with vanilla JS <script> at bottom
+- Mobile responsive with media queries`;
 }
 </script>
 </body>
