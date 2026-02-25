@@ -1080,6 +1080,14 @@
               <div class="chip" data-schema="Review">Review</div>
             </div>
           </div>
+
+          <hr class="field-divider">
+
+          <div class="field">
+            <label>Brand Colors <span class="label-hint">— Claude will apply these to headings &amp; CTA box CSS</span></label>
+            <textarea id="pageBrandColors" rows="2" placeholder="e.g. #1d4ed8 and #f59e0b&#10;or: dark navy headings, gold CTA button&#10;or: https://example.com (Claude will match your site colors)"></textarea>
+            <div class="hint-text">Paste hex codes, describe your colors, or drop in your site URL. Leave blank for default styling.</div>
+          </div>
           <div class="step-nav">
             <button class="btn btn-primary" onclick="completeStep2()">Continue →</button>
           </div>
@@ -1238,6 +1246,23 @@
               <div class="keyword-tags" id="crossSiloTags" onclick="document.getElementById('crossSiloInput').focus()">
                 <input type="text" class="kw-input" id="crossSiloInput" placeholder="e.g. /composting/ or Composting Guide...">
               </div>
+            </div>
+
+            <div class="field">
+              <label>Words Per Page <span class="label-hint">— applied to every page in the silo</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="siloWordCount" min="500" max="5000" step="100" value="1500" oninput="updateSiloWC()">
+                <span class="slider-value" id="siloWcDisplay">1,500 words</span>
+              </div>
+              <div class="hint-text" id="siloWcHint">Good balance of depth and generation speed for most silo pages.</div>
+            </div>
+
+            <hr class="field-divider">
+
+            <div class="field">
+              <label>Brand Colors <span class="label-hint">— Claude will apply these to headings &amp; CTA box across all silo pages</span></label>
+              <textarea id="siloBrandColors" rows="2" placeholder="e.g. #166534 and #f59e0b&#10;or: forest green headings, warm gold CTA&#10;or: https://gardenwiseguy.com (Claude will match your site colors)"></textarea>
+              <div class="hint-text">Paste hex codes, describe your colors, or drop in your site URL. Leave blank for default styling.</div>
             </div>
 
             <div class="step-nav">
@@ -1593,6 +1618,7 @@ function buildConfigSummary() {
       <span style="color:var(--muted);">Word count</span><span>${wc.toLocaleString()}+ words</span>
       <span style="color:var(--muted);">Schema</span><span>${schemaTypes.join(', ')}</span>
       <span style="color:var(--muted);">URL</span><span style="word-break:break-all;font-family:var(--mono);font-size:11px;">${url}</span>
+      ${(document.getElementById('pageBrandColors')?.value.trim()) ? `<span style="color:var(--muted);">Brand colors</span><span style="font-style:italic;">${document.getElementById('pageBrandColors').value.trim().slice(0,60)}${document.getElementById('pageBrandColors').value.trim().length > 60 ? '…' : ''}</span>` : ''}
     </div>
   `;
 }
@@ -1612,7 +1638,7 @@ async function generatePage() {
 
   startLoading(focusKw);
 
-  const prompt = buildPrompt(focusKw, secKeywords, pageType, siteName, targetUrl, tone, schemaTypes, pageTitle, wc);
+  const prompt = buildPrompt(focusKw, secKeywords, pageType, siteName, targetUrl, tone, schemaTypes, pageTitle, wc, (document.getElementById('pageBrandColors')?.value.trim() || ''));
 
   try {
     // ✅ Calls your backend — API key never touches the browser
@@ -1656,11 +1682,22 @@ async function generatePage() {
   }
 }
 
-function buildPrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc) {
+function buildPrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc, brandColors) {
   const slug = getSlug();
   const title = pageTitle || (focusKw + ' | ' + siteName);
   const secList = secKws.length ? secKws.join(', ') : 'none specified';
   const schemaList = schemas.join(', ');
+  const brandColorInstruction = brandColors
+    ? `BRAND COLORS — interpret the following and apply to the CSS:
+"${brandColors}"
+- If hex codes are given (e.g. #1d4ed8), use them exactly
+- If colors are described (e.g. "dark navy, gold"), choose the closest appropriate hex values
+- If a URL is given, infer brand colors from the domain/brand name
+- Apply the primary brand color to ALL h1, h2, h3 elements
+- Apply the secondary/accent color as the CTA box background
+- Auto-set CTA text to white or black based on contrast
+- If only one color is given, use it for headings and derive a complementary CTA color`
+    : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
 
   return `You are an expert SEO content writer and WordPress developer. Generate WORDPRESS BODY CONTENT ONLY — no full HTML page, no <html>, no <head>, no header, no nav, no footer.
 
@@ -1722,6 +1759,8 @@ SECTION 3 — PAGE BODY CONTENT:
 
 STYLING:
 - <style> block with .wp-seo- prefixed CSS
+- ${brandColorInstruction}
+- The page MUST include a styled CTA box near the bottom
 - Clean, professional, WordPress-theme-compatible
 - FAQ accordion with vanilla JS <script> at bottom
 - Mobile responsive with media queries`;
@@ -2006,7 +2045,7 @@ function completeSiloStep1() {
   const slug = document.getElementById('pillarSlug').value.trim();
   if (!title) { showToast('error', 'Please enter a Pillar Title'); return; }
   if (!slug)  { showToast('error', 'Please enter a Pillar Slug');  return; }
-  document.getElementById('siloSummary1').textContent = `"${title}" → /${slug}/`;
+  document.getElementById('siloSummary1').textContent = `"${title}" → /${slug}/ · ${getSiloWordCount().toLocaleString()} words/page`;
   goToSiloStep(2);
   if (childPosts.length === 0) addChildPost();
 }
@@ -2149,6 +2188,8 @@ function buildSiloConfigSummary() {
       <span style="color:var(--muted);">Pillar slug</span><span style="font-family:var(--mono);font-size:12px;background:var(--chip-bg);padding:1px 6px;border-radius:4px;">/${pillarSlug}/</span>
       <span style="color:var(--muted);">Primary keyword</span><span>${pillarPKw||'—'}</span>
       <span style="color:var(--muted);">Secondary kws</span><span>${pillarSecKws.length ? pillarSecKws.join(', ') : '—'}</span>
+      <span style="color:var(--muted);">Words per page</span><span>${getSiloWordCount().toLocaleString()} words</span>
+      ${document.getElementById('siloBrandColors')?.value.trim() ? `<span style="color:var(--muted);">Brand colors</span><span style="font-style:italic;color:var(--text);">${document.getElementById('siloBrandColors').value.trim().slice(0,60)}${document.getElementById('siloBrandColors').value.trim().length > 60 ? '…' : ''}</span>` : ''}
       <span style="color:var(--muted);">Site URL</span><span style="font-family:var(--mono);font-size:11px;">${siteUrl}</span>
       <span style="color:var(--muted);">Child posts</span><span>${validPosts.length}</span>
       ${rows}
@@ -2243,6 +2284,23 @@ function toSlug(str) {
     .trim()
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
+}
+
+// ─── SILO WORD COUNT ───
+function updateSiloWC() {
+  const v = parseInt(document.getElementById('siloWordCount').value);
+  document.getElementById('siloWcDisplay').textContent = v.toLocaleString() + ' words';
+  const hint = v < 700  ? 'Lean pages — fast to generate, lighter on content depth.'
+    : v < 1200 ? 'Good for focused child posts with a clear single topic.'
+    : v < 2000 ? 'Good balance of depth and generation speed for most silo pages.'
+    : v < 3000 ? 'Comprehensive pages — ideal for pillar content and detailed guides.'
+    : 'Deep-dive content — slower to generate but maximum topical authority.';
+  document.getElementById('siloWcHint').textContent = hint;
+}
+
+function getSiloWordCount() {
+  const el = document.getElementById('siloWordCount');
+  return el ? parseInt(el.value) || 1500 : 1500;
 }
 
 // ─── GENERATE SILO BLUEPRINT ───
@@ -2432,7 +2490,7 @@ async function buildSiloPages() {
   const siteUrl     = (document.getElementById('siloSiteUrl').value.trim() || 'https://example.com').replace(/\/$/, '');
   const validPosts  = childPosts.filter(cp => cp.title && cp.slug);
   const tone        = 'professional';
-  const wc          = 1500;
+  const wc          = getSiloWordCount();
 
   if (!pillarTitle || !pillarSlug) { isBuilding = false; showToast('error', 'Missing pillar details'); return; }
   if (validPosts.length === 0)     { isBuilding = false; showToast('error', 'No child posts to build'); return; }
@@ -2506,7 +2564,8 @@ async function buildSiloPages() {
         pillarTitle, pg.url, tone,
         ['Article', 'FAQPage', 'BreadcrumbList'],
         pg.label, wc, pg.internalLinks,
-        pillarSlug, pg.isPillar
+        pillarSlug, pg.isPillar,
+        document.getElementById('siloBrandColors')?.value.trim() || ''
       );
 
       const res = await fetch('/api/generate', {
@@ -2630,11 +2689,22 @@ ${bodyContent}
 }
 
 // ─── SILO-AWARE PAGE CONTENT PROMPT ───
-function buildSiloPagePrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc, internalLinks, pillarSlug, isPillar) {
+function buildSiloPagePrompt(focusKw, secKws, pageType, siteName, url, tone, schemas, pageTitle, wc, internalLinks, pillarSlug, isPillar, colors) {
   const slug = url.split('/').filter(Boolean).pop() || toSlug(focusKw);
   const title = pageTitle || (focusKw + ' | ' + siteName);
   const secList = secKws.length ? secKws.join(', ') : 'none specified';
   const schemaList = schemas.join(', ');
+  const brandColorInstruction = colors
+    ? `BRAND COLORS — interpret the following and apply to the CSS:
+"${colors}"
+- If hex codes are given (e.g. #1d4ed8), use them exactly
+- If colors are described (e.g. "dark navy, gold"), choose the closest appropriate hex values
+- If a URL is given, infer brand colors from the domain/brand name
+- Apply the primary brand color to ALL h1, h2, h3 elements
+- Apply the secondary/accent color as the CTA box background
+- Auto-set CTA text to white or black based on contrast
+- If only one color is given, use it for headings and derive a complementary CTA color`
+    : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
 
   const linkBlock = internalLinks.length
     ? `REQUIRED INTERNAL LINKS — embed ALL of these as natural contextual anchor links within the body copy:
@@ -2708,6 +2778,8 @@ SECTION 3 — PAGE BODY CONTENT:
 
 STYLING:
 - <style> block with .wp-seo- prefixed CSS
+- ${brandColorInstruction}
+- The page MUST include a styled CTA box near the bottom
 - Clean, professional, WordPress-theme-compatible
 - FAQ accordion with vanilla JS <script> at bottom
 - Mobile responsive with media queries`;
