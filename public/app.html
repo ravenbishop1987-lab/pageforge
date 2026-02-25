@@ -1735,6 +1735,7 @@ async function generatePage() {
     if (!html || html.length < 200) throw new Error('Could not extract content. Try again.');
 
     if (pageDiviMode) html = stripInlineStyles(html);
+    else html = enforceCSSScoping(html);
     generatedHTML = html;
     stopLoading();
     renderResult(html, focusKw, targetUrl);
@@ -1767,22 +1768,44 @@ Rules for interpreting:
     : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
 
   const diviMode = typeof pageDiviMode !== 'undefined' && pageDiviMode;
+  const scopeId = 'pf-' + slug.slice(0,6).replace(/[^a-z0-9]/g,'') + '-' + Math.random().toString(36).slice(2,6);
   const stylingInstruction = diviMode
     ? `STYLING — DIVI MODE:
 - DO NOT include any <style> blocks whatsoever
 - DO NOT add inline style="" attributes on any element
 - DO NOT include any <script> blocks for FAQ accordion
-- Output clean semantic HTML only — headings, paragraphs, lists, divs with class names only
-- Use descriptive Divi-friendly class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
-- Divi's theme builder controls all colors, fonts, spacing, and layout
-- CTA box: plain <div class="wp-seo-cta"><p>...</p></div> — no background, no inline styles`
-    : `STYLING:
-- <style> block with .wp-seo- prefixed CSS
-- ${brandColorInstruction}
-- The page MUST include a styled CTA box near the bottom
-- Clean, professional, WordPress-theme-compatible
-- FAQ accordion with vanilla JS <script> at bottom
-- Mobile responsive with media queries`;
+- Wrap ALL content in: <div id="${scopeId}" class="pf-content">...</div>
+- Use class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
+- Divi theme builder controls all colors, fonts, spacing, layout
+- CTA box: <div class="wp-seo-cta"><p>text here</p></div> — no inline styles`
+    : `STYLING — SCOPED CSS (follow every rule exactly or WordPress will break):
+
+STEP 1 — Wrap ALL content in one outer div:
+<div id="${scopeId}" class="pf-content">
+  ...everything goes here...
+</div>
+
+STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
+CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
+CORRECT:   #${scopeId} .wp-seo-cta { background: #f59e0b; }
+WRONG:     h1 { color: #1d4ed8; }  ← breaks WordPress theme
+WRONG:     .wp-seo-cta { background: #f59e0b; }  ← leaks globally
+
+ABSOLUTE BANS — these break WordPress/Divi/themes:
+- NEVER target body, html, *, :root
+- NEVER use !important
+- NEVER use global resets (box-sizing:border-box on *, margin:0 on body)
+- NEVER write a selector without the #${scopeId} prefix
+
+LAYOUT: Set max-width on #${scopeId} itself, never on body
+IMAGES: #${scopeId} img { max-width:100%; height:auto; }
+LINKS: #${scopeId} a { } — scoped only
+FAQ JS: use document.querySelector('#${scopeId}') as root, never document globally
+
+${brandColorInstruction}
+
+MEDIA QUERIES: scope ALL selectors inside @media too:
+@media (max-width:768px) { #${scopeId} h1 { font-size:1.5rem; } }`;
 
   return `You are an expert SEO content writer and WordPress developer. Generate WORDPRESS BODY CONTENT ONLY — no full HTML page, no <html>, no <head>, no header, no nav, no footer.
 
@@ -2409,13 +2432,32 @@ function toggleDivi(mode) {
 
 // Strip all <style> blocks and inline style="" attributes from generated HTML
 function stripInlineStyles(html) {
-  // Remove <style>...</style> blocks (including multi-line)
   html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
-  // Remove inline style attributes from all tags
   html = html.replace(/\s+style\s*=\s*["'][^"']*["']/gi, '');
-  // Remove any leftover empty style attributes
   html = html.replace(/\s+style\s*=\s*[""]["']/gi, '');
   return html.trim();
+}
+
+// Post-processor: enforce CSS scoping — re-prefix any rules missing the scope ID
+function enforceCSSScoping(html) {
+  const scopeMatch = html.match(/id="(pf-[a-z0-9-]+)"/);
+  if (!scopeMatch) return html;
+  const sid = scopeMatch[1];
+
+  return html.replace(/<style>([\s\S]*?)<\/style>/gi, (_full, css) => {
+    const scoped = css.replace(/([^{}]+)\{/g, (_m, selector) => {
+      if (/^\s*@/.test(selector.trim())) return _m;
+      if (selector.includes('#' + sid)) return _m;
+      const fixed = selector.split(',').map(s => {
+        s = s.trim();
+        if (!s || /^\s*\/\*/.test(s)) return s;
+        if (/^(html|body|\*|:root)(\s|$)/.test(s)) return '#' + sid;
+        return '#' + sid + ' ' + s;
+      }).join(', ');
+      return fixed + ' {';
+    });
+    return '<style>' + scoped + '</style>';
+  });
 }
 async function generateSilo() {
   const pillarTitle = document.getElementById('pillarTitle').value.trim();
@@ -2707,6 +2749,7 @@ async function buildSiloPages() {
       }
 
       if (siloDiviMode) html = stripInlineStyles(html);
+      else html = enforceCSSScoping(html);
       const wordCount = html.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
       const fullPage = wrapSiloPageShell(pg.label, pg.url, html);
       builtPages.push({ filename: pg.slug + '.html', content: fullPage, label: pg.label });
@@ -2823,22 +2866,44 @@ Rules for interpreting:
     : `Use clean, professional default styling. Headings in #111111, CTA box in #2563eb with white text.`;
 
   const diviMode = typeof siloDiviMode !== 'undefined' && siloDiviMode;
+  const scopeId = 'pf-' + slug.slice(0,6).replace(/[^a-z0-9]/g,'') + '-' + Math.random().toString(36).slice(2,6);
   const stylingInstruction = diviMode
     ? `STYLING — DIVI MODE:
 - DO NOT include any <style> blocks whatsoever
 - DO NOT add inline style="" attributes on any element
 - DO NOT include any <script> blocks for FAQ accordion
-- Output clean semantic HTML only — headings, paragraphs, lists, divs with class names only
-- Use descriptive Divi-friendly class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
-- Divi's theme builder controls all colors, fonts, spacing, and layout
-- CTA box: plain <div class="wp-seo-cta"><p>...</p></div> — no background, no inline styles`
-    : `STYLING:
-- <style> block with .wp-seo- prefixed CSS
-- ${brandColorInstruction}
-- The page MUST include a styled CTA box near the bottom
-- Clean, professional, WordPress-theme-compatible
-- FAQ accordion with vanilla JS <script> at bottom
-- Mobile responsive with media queries`;
+- Wrap ALL content in: <div id="${scopeId}" class="pf-content">...</div>
+- Use class names: .wp-seo-faq, .wp-seo-cta, .wp-seo-intro, .wp-seo-section
+- Divi theme builder controls all colors, fonts, spacing, layout
+- CTA box: <div class="wp-seo-cta"><p>text here</p></div> — no inline styles`
+    : `STYLING — SCOPED CSS (follow every rule exactly or WordPress will break):
+
+STEP 1 — Wrap ALL content in one outer div:
+<div id="${scopeId}" class="pf-content">
+  ...everything goes here...
+</div>
+
+STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
+CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
+CORRECT:   #${scopeId} .wp-seo-cta { background: #f59e0b; }
+WRONG:     h1 { color: #1d4ed8; }  ← breaks WordPress theme
+WRONG:     .wp-seo-cta { background: #f59e0b; }  ← leaks globally
+
+ABSOLUTE BANS — these break WordPress/Divi/themes:
+- NEVER target body, html, *, :root
+- NEVER use !important
+- NEVER use global resets (box-sizing:border-box on *, margin:0 on body)
+- NEVER write a selector without the #${scopeId} prefix
+
+LAYOUT: Set max-width on #${scopeId} itself, never on body
+IMAGES: #${scopeId} img { max-width:100%; height:auto; }
+LINKS: #${scopeId} a { } — scoped only
+FAQ JS: use document.querySelector('#${scopeId}') as root, never document globally
+
+${brandColorInstruction}
+
+MEDIA QUERIES: scope ALL selectors inside @media too:
+@media (max-width:768px) { #${scopeId} h1 { font-size:1.5rem; } }`;
 
   const linkBlock = internalLinks.length
     ? `REQUIRED INTERNAL LINKS — embed ALL of these as natural contextual anchor links within the body copy:
