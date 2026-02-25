@@ -1788,19 +1788,85 @@ STEP 1 — Wrap ALL content in one outer div:
 STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
 CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
 CORRECT:   #${scopeId} .wp-seo-cta { background: #f59e0b; }
-WRONG:     h1 { color: #1d4ed8; }  ← breaks WordPress theme
-WRONG:     .wp-seo-cta { background: #f59e0b; }  ← leaks globally
+WRONG:     h1 { color: #1d4ed8; }  — breaks WordPress theme
+WRONG:     .wp-seo-cta { background: #f59e0b; }  — leaks globally
 
-ABSOLUTE BANS — these break WordPress/Divi/themes:
+ABSOLUTE BANS:
 - NEVER target body, html, *, :root
 - NEVER use !important
-- NEVER use global resets (box-sizing:border-box on *, margin:0 on body)
 - NEVER write a selector without the #${scopeId} prefix
 
-LAYOUT: Set max-width on #${scopeId} itself, never on body
-IMAGES: #${scopeId} img { max-width:100%; height:auto; }
-LINKS: #${scopeId} a { } — scoped only
-FAQ JS: use document.querySelector('#${scopeId}') as root, never document globally
+STEP 3 — FIRST rule inside the style block MUST be this scoped reset to neutralise
+any WordPress/Divi/theme global CSS bleeding into the content:
+#${scopeId} {
+  all: initial;
+  display: block;
+  box-sizing: border-box;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #333;
+}
+#${scopeId} * {
+  box-sizing: border-box;
+}
+#${scopeId} h1, #${scopeId} h2, #${scopeId} h3,
+#${scopeId} h4, #${scopeId} h5, #${scopeId} h6 {
+  all: unset;
+  display: block;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.8em 0 0.4em;
+}
+#${scopeId} p {
+  all: unset;
+  display: block;
+  margin: 0 0 1.2em;
+  line-height: 1.7;
+}
+#${scopeId} a {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+}
+#${scopeId} img {
+  all: unset;
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 1em 0;
+}
+#${scopeId} ul, #${scopeId} ol {
+  all: unset;
+  display: block;
+  padding-left: 1.6em;
+  margin: 0 0 1.2em;
+}
+#${scopeId} li {
+  all: unset;
+  display: list-item;
+  margin-bottom: 0.4em;
+}
+#${scopeId} table {
+  all: unset;
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5em;
+}
+#${scopeId} th, #${scopeId} td {
+  all: unset;
+  display: table-cell;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box, FAQ styles etc — all scoped to #${scopeId}
 
 ${brandColorInstruction}
 
@@ -1926,7 +1992,7 @@ function stopLoading() {
 
 // ─── RENDER RESULT ───
 function renderResult(html, kw, url) {
-  const shell = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0 auto;padding:32px 40px;font-family:-apple-system,sans-serif;max-width:860px;background:#fff;color:#111;}*{box-sizing:border-box}</style></head><body>${html}</body></html>`;
+  const shell = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>.pf-preview-wrap{padding:32px 40px;font-family:-apple-system,sans-serif;max-width:860px;margin:0 auto;}</style></head><body class="pf-preview-wrap">${html}</body></html>`;
   const blob = new Blob([shell], { type: 'text/html; charset=utf-8' });
   const blobUrl = URL.createObjectURL(blob);
   const frame = document.getElementById('previewFrame');
@@ -2832,12 +2898,6 @@ function wrapSiloPageShell(title, url, bodyContent) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
 <link rel="canonical" href="${url}">
-<style>
-  body { margin: 0 auto; padding: 32px 40px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 860px; background: #fff; color: #111; line-height: 1.7; }
-  * { box-sizing: border-box; }
-  img { max-width: 100%; height: auto; border-radius: 8px; }
-  a { color: #2563eb; }
-</style>
 </head>
 <body>
 ${bodyContent}
@@ -2886,19 +2946,85 @@ STEP 1 — Wrap ALL content in one outer div:
 STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
 CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
 CORRECT:   #${scopeId} .wp-seo-cta { background: #f59e0b; }
-WRONG:     h1 { color: #1d4ed8; }  ← breaks WordPress theme
-WRONG:     .wp-seo-cta { background: #f59e0b; }  ← leaks globally
+WRONG:     h1 { color: #1d4ed8; }  — breaks WordPress theme
+WRONG:     .wp-seo-cta { background: #f59e0b; }  — leaks globally
 
-ABSOLUTE BANS — these break WordPress/Divi/themes:
+ABSOLUTE BANS:
 - NEVER target body, html, *, :root
 - NEVER use !important
-- NEVER use global resets (box-sizing:border-box on *, margin:0 on body)
 - NEVER write a selector without the #${scopeId} prefix
 
-LAYOUT: Set max-width on #${scopeId} itself, never on body
-IMAGES: #${scopeId} img { max-width:100%; height:auto; }
-LINKS: #${scopeId} a { } — scoped only
-FAQ JS: use document.querySelector('#${scopeId}') as root, never document globally
+STEP 3 — FIRST rule inside the style block MUST be this scoped reset to neutralise
+any WordPress/Divi/theme global CSS bleeding into the content:
+#${scopeId} {
+  all: initial;
+  display: block;
+  box-sizing: border-box;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #333;
+}
+#${scopeId} * {
+  box-sizing: border-box;
+}
+#${scopeId} h1, #${scopeId} h2, #${scopeId} h3,
+#${scopeId} h4, #${scopeId} h5, #${scopeId} h6 {
+  all: unset;
+  display: block;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0.8em 0 0.4em;
+}
+#${scopeId} p {
+  all: unset;
+  display: block;
+  margin: 0 0 1.2em;
+  line-height: 1.7;
+}
+#${scopeId} a {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+}
+#${scopeId} img {
+  all: unset;
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 1em 0;
+}
+#${scopeId} ul, #${scopeId} ol {
+  all: unset;
+  display: block;
+  padding-left: 1.6em;
+  margin: 0 0 1.2em;
+}
+#${scopeId} li {
+  all: unset;
+  display: list-item;
+  margin-bottom: 0.4em;
+}
+#${scopeId} table {
+  all: unset;
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5em;
+}
+#${scopeId} th, #${scopeId} td {
+  all: unset;
+  display: table-cell;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box, FAQ styles etc — all scoped to #${scopeId}
 
 ${brandColorInstruction}
 
