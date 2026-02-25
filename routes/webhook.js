@@ -2,7 +2,6 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const stripeRouter = require('./stripe');
 
 // ─── Stripe Webhook Handler ───────────────────────────────────────────
-// Handles async events: subscription cancellations, renewals, failures
 module.exports = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -21,15 +20,7 @@ module.exports = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  const licenses = stripeRouter.licenses;
-
-  // ─── Helper: find email from customerId ───────────────────────────
-  function findEmailByCustomerId(customerId) {
-    for (const [email, record] of licenses.entries()) {
-      if (record.customerId === customerId) return email;
-    }
-    return null;
-  }
+  const { getLicense, upsertLicense, getLicenseByCustomerId } = stripeRouter;
 
   console.log(`📨 Webhook: ${event.type}`);
 
@@ -39,25 +30,28 @@ module.exports = async (req, res) => {
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object;
       const customerId = invoice.customer;
-      const email = findEmailByCustomerId(customerId);
-      if (email) {
-        const record = licenses.get(email);
-        licenses.set(email, { ...record, active: true });
-        console.log(`✅ Renewal OK: ${email}`);
+      const record = await getLicenseByCustomerId(customerId);
+      if (record) {
+        await upsertLicense(record.email, {
+          ...record,
+          customerId: record.customer_id,
+          subscriptionId: record.subscription_id,
+          active: true,
+        });
+        console.log(`✅ Renewal OK: ${record.email}`);
       }
       break;
     }
 
-    // ── Payment failed — could disable access or send dunning email ─
+    // ── Payment failed ─────────────────────────────────────────────
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
       const customerId = invoice.customer;
-      const email = findEmailByCustomerId(customerId);
-      if (email) {
-        // Optional: disable after N failures. Here we just log.
-        // const record = licenses.get(email);
-        // licenses.set(email, { ...record, active: false });
-        console.log(`⚠️  Payment failed for: ${email}`);
+      const record = await getLicenseByCustomerId(customerId);
+      if (record) {
+        // Optional: disable after N failures
+        // await upsertLicense(record.email, { ...record, active: false });
+        console.log(`⚠️  Payment failed for: ${record.email}`);
       }
       break;
     }
@@ -66,14 +60,15 @@ module.exports = async (req, res) => {
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
       const customerId = sub.customer;
-      const email = findEmailByCustomerId(customerId);
-      if (email) {
-        const record = licenses.get(email);
-        if (record?.plan === 'monthly') {
-          licenses.set(email, { ...record, active: false });
-          console.log(`❌ Subscription cancelled: ${email}`);
-        }
-        // Lifetime payers keep access even if somehow sub object is deleted
+      const record = await getLicenseByCustomerId(customerId);
+      if (record && record.plan === 'monthly') {
+        await upsertLicense(record.email, {
+          ...record,
+          customerId: record.customer_id,
+          subscriptionId: record.subscription_id,
+          active: false,
+        });
+        console.log(`❌ Subscription cancelled: ${record.email}`);
       }
       break;
     }
@@ -82,12 +77,16 @@ module.exports = async (req, res) => {
     case 'customer.subscription.updated': {
       const sub = event.data.object;
       const customerId = sub.customer;
-      const email = findEmailByCustomerId(customerId);
-      if (email) {
+      const record = await getLicenseByCustomerId(customerId);
+      if (record) {
         const active = ['active', 'trialing'].includes(sub.status);
-        const record = licenses.get(email);
-        licenses.set(email, { ...record, active });
-        console.log(`🔄 Subscription updated: ${email} → ${sub.status}`);
+        await upsertLicense(record.email, {
+          ...record,
+          customerId: record.customer_id,
+          subscriptionId: record.subscription_id,
+          active,
+        });
+        console.log(`🔄 Subscription updated: ${record.email} → ${sub.status}`);
       }
       break;
     }
@@ -98,7 +97,7 @@ module.exports = async (req, res) => {
       if (session.mode === 'payment' && session.payment_status === 'paid') {
         const email = session.customer_details?.email?.toLowerCase();
         if (email) {
-          licenses.set(email, {
+          await upsertLicense(email, {
             plan: 'lifetime',
             active: true,
             customerId: session.customer,
@@ -112,7 +111,6 @@ module.exports = async (req, res) => {
     }
 
     default:
-      // Unhandled event type — safe to ignore
       break;
   }
 

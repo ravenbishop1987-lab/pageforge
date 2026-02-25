@@ -1,25 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-// ─── In-memory license store ──────────────────────────────────────────
-const licenses = new Map();
+const supabase = require('./supabase');
 
 // ─── Auto-create Stripe products if price IDs not set ────────────────
-// This means you NEVER have to manually copy price IDs — just set your
-// STRIPE_SECRET_KEY and the products are created automatically on boot.
 let cachedPrices = {
   monthly: process.env.STRIPE_PRICE_MONTHLY || null,
   lifetime: process.env.STRIPE_PRICE_LIFETIME || null,
 };
 
 async function ensurePrices() {
-  if (cachedPrices.monthly && cachedPrices.lifetime) return; // already set
+  if (cachedPrices.monthly && cachedPrices.lifetime) return;
 
   console.log('⚙️  Price IDs not configured — auto-creating Stripe products...');
 
   try {
-    // Search for existing products first to avoid duplicates
     const existing = await stripe.products.list({ limit: 20, active: true });
 
     let monthlyProduct = existing.data.find(p => p.name === 'Pro Monthly');
@@ -35,7 +30,6 @@ async function ensurePrices() {
       console.log('✅ Created product: Lifetime Access');
     }
 
-    // Check for existing prices on these products
     if (!cachedPrices.monthly) {
       const existingPrices = await stripe.prices.list({ product: monthlyProduct.id, active: true });
       const existing12 = existingPrices.data.find(p => p.unit_amount === 1200 && p.recurring?.interval === 'month');
@@ -75,14 +69,56 @@ async function ensurePrices() {
   }
 }
 
-// Run on startup
 ensurePrices();
 
-// ─── Helper: check if email has active access ─────────────────────────
-function hasAccess(email) {
-  const record = licenses.get(email?.toLowerCase());
-  if (!record) return false;
-  return record.active === true;
+// ─── Supabase License Helpers ─────────────────────────────────────────
+async function getLicense(email) {
+  if (!email) return null;
+  const { data, error } = await supabase
+    .from('licenses')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .single();
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error('getLicense error:', error.message);
+  }
+  return data;
+}
+
+async function upsertLicense(email, licenseData) {
+  const { data, error } = await supabase
+    .from('licenses')
+    .upsert({
+      email: email.toLowerCase(),
+      plan: licenseData.plan,
+      active: licenseData.active,
+      customer_id: licenseData.customerId,
+      subscription_id: licenseData.subscriptionId,
+      activated_at: licenseData.activatedAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'email' })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('upsertLicense error:', error.message);
+    return null;
+  }
+  return data;
+}
+
+async function getLicenseByCustomerId(customerId) {
+  const { data, error } = await supabase
+    .from('licenses')
+    .select('*')
+    .eq('customer_id', customerId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error('getLicenseByCustomerId error:', error.message);
+  }
+  return data;
 }
 
 // ─── POST /api/stripe/checkout ────────────────────────────────────────
@@ -93,7 +129,6 @@ router.post('/checkout', async (req, res) => {
     return res.status(400).json({ error: 'Invalid plan. Use "monthly" or "lifetime".' });
   }
 
-  // Ensure prices exist (in case startup hasn't finished)
   await ensurePrices();
 
   const priceId = plan === 'monthly' ? cachedPrices.monthly : cachedPrices.lifetime;
@@ -112,7 +147,6 @@ router.post('/checkout', async (req, res) => {
       allow_promotion_codes: true,
     };
 
-    // Pre-fill email if provided
     if (email) sessionConfig.customer_email = email;
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
@@ -125,7 +159,6 @@ router.post('/checkout', async (req, res) => {
 });
 
 // ─── POST /api/stripe/verify ─────────────────────────────────────────
-// Called after redirect from Stripe to verify payment & issue access
 router.post('/verify', async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
@@ -150,8 +183,7 @@ router.post('/verify', async (req, res) => {
       ? session.customer
       : session.customer?.id;
 
-    // Store license
-    licenses.set(email, {
+    await upsertLicense(email, {
       plan,
       active: true,
       customerId,
@@ -165,7 +197,6 @@ router.post('/verify', async (req, res) => {
       success: true,
       email,
       plan,
-      // Return a simple token (email:timestamp signed in prod — use JWT for real apps)
       accessToken: Buffer.from(`${email}:${Date.now()}`).toString('base64'),
     });
   } catch (err) {
@@ -175,11 +206,9 @@ router.post('/verify', async (req, res) => {
 });
 
 // ─── POST /api/stripe/check-access ───────────────────────────────────
-// Quick check: does this email/token have active access?
-router.post('/check-access', (req, res) => {
+router.post('/check-access', async (req, res) => {
   const { email, accessToken } = req.body;
 
-  // Token-based check (decode email from token)
   let resolvedEmail = email?.toLowerCase();
   if (accessToken && !resolvedEmail) {
     try {
@@ -190,7 +219,7 @@ router.post('/check-access', (req, res) => {
 
   if (!resolvedEmail) return res.status(400).json({ error: 'Provide email or accessToken' });
 
-  const record = licenses.get(resolvedEmail);
+  const record = await getLicense(resolvedEmail);
   if (record?.active) {
     res.json({ access: true, plan: record.plan, email: resolvedEmail });
   } else {
@@ -199,18 +228,17 @@ router.post('/check-access', (req, res) => {
 });
 
 // ─── POST /api/stripe/portal ──────────────────────────────────────────
-// Creates a Stripe Customer Portal session for managing subscriptions
 router.post('/portal', async (req, res) => {
   const { email } = req.body;
-  const record = licenses.get(email?.toLowerCase());
+  const record = await getLicense(email?.toLowerCase());
 
-  if (!record?.customerId) {
+  if (!record?.customer_id) {
     return res.status(404).json({ error: 'No subscription found for this email.' });
   }
 
   try {
     const session = await stripe.billingPortal.sessions.create({
-      customer: record.customerId,
+      customer: record.customer_id,
       return_url: `${process.env.APP_URL}/app`,
     });
     res.json({ url: session.url });
@@ -219,7 +247,9 @@ router.post('/portal', async (req, res) => {
   }
 });
 
-// ─── Export license store so webhook can update it ───────────────────
-router.licenses = licenses;
+// ─── Export helpers for webhook ──────────────────────────────────────
+router.getLicense = getLicense;
+router.upsertLicense = upsertLicense;
+router.getLicenseByCustomerId = getLicenseByCustomerId;
 
 module.exports = router;
