@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const stripeRoutes = require('./routes/stripe');
+const generateRoute = require('./routes/generate');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,14 +33,15 @@ app.use('/api', limiter);
 // ─── Stripe API routes ───────────────────────────────────────────────
 app.use('/api/stripe', stripeRoutes);
 
+// ─── Generate API route ──────────────────────────────────────────────
+app.use('/api/generate', generateRoute);
+
 // ─── Health check ────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ─── Named routes ────────────────────────────────────────────────────
-// /app and /dashboard serve the protected generator
-// Access guard in app.html handles redirect if no session
 app.get('/app', (req, res) => res.sendFile(__dirname + '/public/app.html'));
 app.get('/dashboard', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 
@@ -49,4 +51,5 @@ app.get('*', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 app.listen(PORT, () => {
   console.log(`\n🚀 PageForge running at http://localhost:${PORT}`);
   console.log(`   Stripe mode: ${process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? '🟢 LIVE' : '🟡 TEST'}\n`);
+  console.log(`   Claude AI: ${process.env.ANTHROPIC_API_KEY ? '🟢 configured' : '🔴 ANTHROPIC_API_KEY not set'}\n`);
 });

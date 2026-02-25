@@ -141,7 +141,6 @@
     position: relative;
   }
 
-  /* vertical connector */
   .step-left {
     display: flex;
     flex-direction: column;
@@ -231,7 +230,6 @@
     display: block;
   }
 
-  /* Step summary (shown when done) */
   .step-summary {
     display: none;
     font-size: 12px;
@@ -322,33 +320,6 @@
   .char-counter .count.good { color: var(--success); }
   .char-counter .count.warn { color: var(--warning); }
   .char-counter .count.bad { color: var(--error); }
-
-  /* API key row */
-  .api-key-row {
-    position: relative;
-  }
-
-  .api-key-row input {
-    padding-right: 80px;
-    font-family: var(--mono);
-    font-size: 13px;
-  }
-
-  .api-key-toggle {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 11px;
-    color: var(--muted);
-    cursor: pointer;
-    user-select: none;
-    font-family: var(--mono);
-    background: var(--chip-bg);
-    padding: 2px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-  }
 
   /* ─── CHIPS ─── */
   .chip-group {
@@ -561,7 +532,6 @@
   .loading-title { font-size: 16px; font-weight: 600; }
   .loading-kw { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
 
-  /* progress bar */
   .progress-bar-track {
     height: 3px;
     background: var(--border);
@@ -578,7 +548,6 @@
     width: 0%;
   }
 
-  /* loading steps */
   .loading-steps { display: flex; flex-direction: column; gap: 0; }
 
   .lstep {
@@ -706,7 +675,6 @@
   .rtab-panel { display: none; }
   .rtab-panel.active { display: block; }
 
-  /* preview */
   .preview-browser {
     background: #f5f5f5;
     padding: 10px 16px;
@@ -744,7 +712,6 @@
     background: white;
   }
 
-  /* seo score */
   .score-panel { padding: 20px; }
 
   .score-big {
@@ -807,7 +774,6 @@
   .rule-row.fail .rule-dot { background: var(--error); }
   .rule-row.fail { color: var(--muted); }
 
-  /* code */
   .code-panel { position: relative; }
 
   .code-toolbar {
@@ -857,7 +823,6 @@
   .toast.error { background: var(--error); }
   .toast.success { background: var(--success); }
 
-  /* ─── DIVIDERS & MISC ─── */
   hr.field-divider {
     border: none;
     border-top: 1px solid var(--border);
@@ -887,7 +852,6 @@
     gap: 12px;
   }
 
-  /* last step no padding */
   .step:last-child .step-right {
     padding-bottom: 0;
   }
@@ -906,7 +870,6 @@
     PageForge
   </div>
   <div class="topbar-right" id="topbarRight">
-    <span class="badge" id="apiStatusBadge">No API key</span>
     <a href="/dashboard" style="font-size:13px;color:var(--muted);text-decoration:none;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;">← Dashboard</a>
     <button onclick="signOut()" style="font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;padding:6px;">Sign out</button>
   </div>
@@ -985,7 +948,7 @@
   <!-- STEPS -->
   <div class="steps-container">
 
-    <!-- STEP 1: API Key -->
+    <!-- STEP 1: Keyword & Type -->
     <div class="step active" id="step1">
       <div class="step-left">
         <div class="step-circle">1</div>
@@ -993,41 +956,10 @@
       </div>
       <div class="step-right">
         <div class="step-header" onclick="editStep(1)">
-          <div class="step-title">Connect your API key</div>
-          <span class="step-edit-btn" onclick="editStep(1)">Edit</span>
-        </div>
-        <div class="step-summary" id="summary1"></div>
-        <div class="step-content">
-          <div class="step-subtitle">Your key is used client-side only and never stored.</div>
-          <div class="field">
-            <label>Claude API Key</label>
-            <div class="api-key-row">
-              <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off" oninput="onApiKeyInput()">
-              <span class="api-key-toggle" onclick="toggleApiKeyVisibility()">Show</span>
-            </div>
-            <div class="hint-text">Get your key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--text);text-decoration:underline;text-underline-offset:2px;">console.anthropic.com</a></div>
-          </div>
-          <div class="step-nav">
-            <button class="btn btn-primary" onclick="completeStep1()" id="step1Btn">
-              Continue →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- STEP 2: Keyword & Type -->
-    <div class="step" id="step2">
-      <div class="step-left">
-        <div class="step-circle">2</div>
-        <div class="step-line"></div>
-      </div>
-      <div class="step-right">
-        <div class="step-header" onclick="editStep(2)">
           <div class="step-title">Define your target keywords</div>
           <span class="step-edit-btn">Edit</span>
         </div>
-        <div class="step-summary" id="summary2"></div>
+        <div class="step-summary" id="summary1"></div>
         <div class="step-content">
           <div class="step-subtitle">Your primary keyword drives all SEO optimization decisions.</div>
           <div class="field">
@@ -1053,24 +985,24 @@
             </select>
           </div>
           <div class="step-nav">
-            <button class="btn btn-primary" onclick="completeStep2()">Continue →</button>
+            <button class="btn btn-primary" onclick="completeStep1()">Continue →</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- STEP 3: Page details -->
-    <div class="step" id="step3">
+    <!-- STEP 2: Page details -->
+    <div class="step" id="step2">
       <div class="step-left">
-        <div class="step-circle">3</div>
+        <div class="step-circle">2</div>
         <div class="step-line"></div>
       </div>
       <div class="step-right">
-        <div class="step-header" onclick="editStep(3)">
+        <div class="step-header" onclick="editStep(2)">
           <div class="step-title">Page details & settings</div>
           <span class="step-edit-btn">Edit</span>
         </div>
-        <div class="step-summary" id="summary3"></div>
+        <div class="step-summary" id="summary2"></div>
         <div class="step-content">
           <div class="step-subtitle">Configure how your page should be generated.</div>
           <div class="two-col">
@@ -1122,16 +1054,16 @@
             </div>
           </div>
           <div class="step-nav">
-            <button class="btn btn-primary" onclick="completeStep3()">Continue →</button>
+            <button class="btn btn-primary" onclick="completeStep2()">Continue →</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- STEP 4: Generate -->
-    <div class="step" id="step4">
+    <!-- STEP 3: Generate -->
+    <div class="step" id="step3">
       <div class="step-left">
-        <div class="step-circle">4</div>
+        <div class="step-circle">3</div>
       </div>
       <div class="step-right">
         <div class="step-header">
@@ -1140,7 +1072,6 @@
         <div class="step-content">
           <div class="step-subtitle">Review your configuration, then generate. Claude will build a fully SEO-optimized, WordPress-ready HTML page.</div>
 
-          <!-- Summary card -->
           <div id="configSummary" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-bottom:20px;font-size:13px;line-height:2;">
           </div>
 
@@ -1225,7 +1156,6 @@
 <script>
 
 // ─── ACCESS GUARD ───────────────────────────────────────
-// If user has no session, send them back to pricing page
 (function() {
   try {
     const s = JSON.parse(localStorage.getItem('pf_session') || '{}');
@@ -1285,7 +1215,7 @@ function goToStep(n) {
     if (num === n) el.classList.add('active');
   });
   currentStep = n;
-  if (n === 4) buildConfigSummary();
+  if (n === 3) buildConfigSummary();
 }
 
 function editStep(n) {
@@ -1293,52 +1223,19 @@ function editStep(n) {
 }
 
 function completeStep1() {
-  const key = document.getElementById('apiKey').value.trim();
-  if (!key || !key.startsWith('sk-ant-')) {
-    showToast('error', 'Please enter a valid Claude API key (starts with sk-ant-)');
-    return;
-  }
-  document.getElementById('summary1').textContent = '••••••••••••••• connected';
-  goToStep(2);
-}
-
-function completeStep2() {
   const kw = document.getElementById('focusKeyword').value.trim();
   if (!kw) { showToast('error', 'Please enter a focus keyword'); return; }
   const type = document.getElementById('pageType').selectedOptions[0].text;
   const secondary = secKeywords.length ? ` + ${secKeywords.length} secondary` : '';
-  document.getElementById('summary2').textContent = `"${kw}"${secondary} · ${type}`;
-  goToStep(3);
+  document.getElementById('summary1').textContent = `"${kw}"${secondary} · ${type}`;
+  goToStep(2);
 }
 
-function completeStep3() {
+function completeStep2() {
   const wc = document.getElementById('wordCount').value;
   const tone = document.getElementById('tone').selectedOptions[0].text;
-  document.getElementById('summary3').textContent = `${parseInt(wc).toLocaleString()} words · ${tone} tone · ${schemaTypes.length} schema types`;
-  goToStep(4);
-}
-
-// ─── API KEY ───
-function onApiKeyInput() {
-  const key = document.getElementById('apiKey').value.trim();
-  const badge = document.getElementById('apiStatusBadge');
-  if (key.startsWith('sk-ant-')) {
-    badge.textContent = 'API key ready';
-    badge.className = 'badge success';
-  } else if (key.length > 0) {
-    badge.textContent = 'Invalid key';
-    badge.className = 'badge error';
-  } else {
-    badge.textContent = 'No API key';
-    badge.className = 'badge';
-  }
-}
-
-function toggleApiKeyVisibility() {
-  const inp = document.getElementById('apiKey');
-  const btn = document.querySelector('.api-key-toggle');
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
-  else { inp.type = 'password'; btn.textContent = 'Show'; }
+  document.getElementById('summary2').textContent = `${parseInt(wc).toLocaleString()} words · ${tone} tone · ${schemaTypes.length} schema types`;
+  goToStep(3);
 }
 
 // ─── KEYWORD TAGS ───
@@ -1448,8 +1345,8 @@ function buildConfigSummary() {
 }
 
 // ─── GENERATE ───
+// Now calls YOUR backend at /api/generate — API key stays on the server
 async function generatePage() {
-  const apiKey = document.getElementById('apiKey').value.trim();
   const focusKw = document.getElementById('focusKeyword').value.trim();
   const pageType = document.getElementById('pageType').value;
   const siteName = document.getElementById('siteName').value || 'My Website';
@@ -1465,31 +1362,23 @@ async function generatePage() {
   const prompt = buildPrompt(focusKw, secKeywords, pageType, siteName, targetUrl, tone, schemaTypes, pageTitle, wc);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // ✅ Calls your backend — API key never touches the browser
+    const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 16000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, wordCount: wc }),
     });
 
     if (!res.ok) {
-      let msg = `API Error ${res.status}`;
-      try { const d = await res.json(); msg = d.error?.message || msg; } catch(e) {}
+      let msg = `Server error ${res.status}`;
+      try { const d = await res.json(); msg = d.error || msg; } catch(e) {}
       throw new Error(msg);
     }
 
     const data = await res.json();
-    let html = data.content[0]?.text?.trim() || '';
+    let html = data.html?.trim() || '';
 
-    if (!html) throw new Error('Empty response from Claude.');
+    if (!html) throw new Error('Empty response from server.');
 
     const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
     if (fence) html = fence[1].trim();
@@ -1643,7 +1532,6 @@ function stopLoading() {
 
 // ─── RENDER RESULT ───
 function renderResult(html, kw, url) {
-  // Preview
   const shell = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0 auto;padding:32px 40px;font-family:-apple-system,sans-serif;max-width:860px;background:#fff;color:#111;}*{box-sizing:border-box}</style></head><body>${html}</body></html>`;
   const blob = new Blob([shell], { type: 'text/html; charset=utf-8' });
   const blobUrl = URL.createObjectURL(blob);
@@ -1653,18 +1541,14 @@ function renderResult(html, kw, url) {
   frame.src = blobUrl;
   document.getElementById('previewUrl').textContent = url;
 
-  // Code
   document.getElementById('codeBlock').textContent = html;
   document.getElementById('codeLines').textContent = html.split('\n').length + ' lines';
 
-  // SEO Score
   const analysis = analyzeHTML(html, kw);
   renderSEOScore(analysis);
 
-  // Show result
   document.getElementById('resultSection').classList.add('visible');
 
-  // Scroll
   setTimeout(() => {
     document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 200);
@@ -1688,7 +1572,6 @@ function analyzeHTML(html, kw) {
   const metaText = metaMatch ? metaMatch[1].trim() : '';
   const metaLen = metaText.length;
 
-  // heading flow check
   const headings = [...html.matchAll(/<(h[1-6])[^>]*>/gi)].map(m => parseInt(m[1].slice(1)));
   let flowOk = true;
   for (let i = 1; i < headings.length; i++) {
