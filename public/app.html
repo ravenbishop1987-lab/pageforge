@@ -1723,7 +1723,14 @@ async function generatePage() {
 
     if (!html) throw new Error('Empty response from server.');
 
-    html = cleanHTML(html);
+    const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
+    if (fence) html = fence[1].trim();
+
+    if (html.toLowerCase().includes('<!doctype')) {
+      const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      if (body) html = body[1].trim();
+      else html = html.replace(/<head[\s\S]*?<\/head>/i,'').replace(/<\/?(?:html|body|head)[^>]*>/gi,'').trim();
+    }
 
     if (!html || html.length < 200) throw new Error('Could not extract content. Try again.');
 
@@ -1793,7 +1800,7 @@ ABSOLUTE BANS:
 - NEVER use !important
 - NEVER write a selector without the #${scopeId} prefix
 
-STEP 3 — FIRST rule inside the style block MUST be this scoped reset to neutralise
+STEP 3 — FIRST rule inside the style block MUST be this exact scoped reset to neutralise
 any WordPress/Divi/theme global CSS bleeding into the content:
 #${scopeId} {
   all: initial;
@@ -1803,32 +1810,65 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   margin: 0 auto;
   padding: 0 20px 40px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 1rem;
+  font-size: 16px;
   line-height: 1.7;
-  color: #333;
+  color: #333333;
 }
-#${scopeId} * {
+#${scopeId} *, #${scopeId} *::before, #${scopeId} *::after {
   box-sizing: border-box;
 }
-#${scopeId} h1, #${scopeId} h2, #${scopeId} h3,
+#${scopeId} h1 {
+  all: unset;
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #111111;
+  margin: 0 0 0.75em;
+}
+#${scopeId} h2 {
+  all: unset;
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1a1a1a;
+  margin: 1.5em 0 0.5em;
+}
+#${scopeId} h3 {
+  all: unset;
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #222222;
+  margin: 1.2em 0 0.4em;
+}
 #${scopeId} h4, #${scopeId} h5, #${scopeId} h6 {
   all: unset;
   display: block;
-  font-weight: 700;
-  line-height: 1.3;
-  margin: 0.8em 0 0.4em;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #333333;
+  margin: 1em 0 0.3em;
 }
 #${scopeId} p {
   all: unset;
   display: block;
   margin: 0 0 1.2em;
   line-height: 1.7;
+  color: #333333;
+  font-size: 1rem;
 }
 #${scopeId} a {
   all: unset;
   cursor: pointer;
+  color: #2563eb;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
+#${scopeId} a:hover { color: #1d4ed8; }
 #${scopeId} img {
   all: unset;
   display: block;
@@ -1843,10 +1883,14 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   padding-left: 1.6em;
   margin: 0 0 1.2em;
 }
+#${scopeId} ul { list-style: disc; }
+#${scopeId} ol { list-style: decimal; }
 #${scopeId} li {
   all: unset;
   display: list-item;
   margin-bottom: 0.4em;
+  line-height: 1.6;
+  color: #333333;
 }
 #${scopeId} table {
   all: unset;
@@ -1854,21 +1898,87 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1.5em;
+  font-size: 0.95rem;
 }
 #${scopeId} th, #${scopeId} td {
   all: unset;
   display: table-cell;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border: 1px solid #e2e8f0;
   text-align: left;
+  vertical-align: top;
+}
+#${scopeId} th { font-weight: 600; background: #f8fafc; }
+
+STEP 4 — FAQ ACCORDION — use CSS-only <details>/<summary> — NO JavaScript at all:
+#${scopeId} .wp-seo-faq { margin: 2em 0; }
+#${scopeId} .wp-seo-faq details {
+  all: unset;
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+#${scopeId} .wp-seo-faq details[open] { border-color: #2563eb; }
+#${scopeId} .wp-seo-faq summary {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #111111;
+  cursor: pointer;
+  background: #f9fafb;
+  list-style: none;
+  user-select: none;
+}
+#${scopeId} .wp-seo-faq summary:hover { background: #f1f5f9; }
+#${scopeId} .wp-seo-faq summary::after {
+  content: '+';
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: #6b7280;
+  flex-shrink: 0;
+  margin-left: 12px;
+  transition: transform 0.2s;
+}
+#${scopeId} .wp-seo-faq details[open] summary::after { content: '−'; }
+#${scopeId} .wp-seo-faq .faq-answer {
+  padding: 14px 18px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #374151;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
 }
 
-Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box, FAQ styles etc — all scoped to #${scopeId}
+FAQ HTML STRUCTURE — use exactly this pattern for each Q&A:
+<div class="wp-seo-faq">
+  <details>
+    <summary>Question text here?</summary>
+    <div class="faq-answer"><p>Answer text here.</p></div>
+  </details>
+  <details>
+    <summary>Second question?</summary>
+    <div class="faq-answer"><p>Second answer.</p></div>
+  </details>
+</div>
+CRITICAL: NEVER use onclick, addEventListener, or any JavaScript for the FAQ. The <details>/<summary> elements are natively interactive in all browsers — no JS needed.
+CRITICAL: NEVER include a <script> block anywhere in the output — WordPress strips them and it breaks the page.
+
+Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box styles etc — all scoped to #${scopeId}
 
 ${brandColorInstruction}
 
 MEDIA QUERIES: scope ALL selectors inside @media too:
-@media (max-width:768px) { #${scopeId} h1 { font-size:1.5rem; } }`;
+@media (max-width:768px) {
+  #${scopeId} h1 { font-size: 1.6rem; }
+  #${scopeId} h2 { font-size: 1.25rem; }
+  #${scopeId} { padding: 0 16px 32px; }
+}`;
 
   return `You are an expert SEO content writer and WordPress developer. Generate WORDPRESS BODY CONTENT ONLY — no full HTML page, no <html>, no <head>, no header, no nav, no footer.
 
@@ -1925,7 +2035,8 @@ SECTION 3 — PAGE BODY CONTENT:
 - Use https://placehold.co/800x400?text=${slug} for main image
 - Use https://placehold.co/600x300?text=Section for secondary images
 - 3+ internal anchor links: <a href="${url}#section-id">text</a>
-- FAQ section with 5+ Q&As
+- FAQ section with 5+ Q&As using the <details>/<summary> structure above — NO JavaScript
+- NEVER include a <script> block — it will be stripped by WordPress
 - DO NOT include header/nav/footer/breadcrumb UI/sidebar
 
 ${stylingInstruction}`;
@@ -2494,41 +2605,6 @@ function toggleDivi(mode) {
 }
 
 // Strip all <style> blocks and inline style="" attributes from generated HTML
-// ─── CLEAN HTML — strips all head-level elements from generated content ───
-function cleanHTML(html) {
-  // 1. Strip markdown code fences
-  const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
-  if (fence) html = fence[1].trim();
-
-  // 2. If full HTML page returned, extract just the body
-  if (html.toLowerCase().includes('<!doctype') || /<html[\s>]/i.test(html)) {
-    const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    if (body) {
-      html = body[1].trim();
-    } else {
-      // Fallback: strip all head-level wrapper tags
-      html = html
-        .replace(/<!doctype[^>]*>/gi, '')
-        .replace(/<html[^>]*>/gi, '')
-        .replace(/<\/html>/gi, '')
-        .replace(/<head[\s\S]*?<\/head>/gi, '')
-        .replace(/<body[^>]*>/gi, '')
-        .replace(/<\/body>/gi, '')
-        .trim();
-    }
-  }
-
-  // 3. Strip any remaining head-only elements that shouldn't be in body content
-  html = html
-    .replace(/<meta[^>]*>/gi, '')
-    .replace(/<link[^>]*>/gi, '')
-    .replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '')
-    .replace(/<base[^>]*>/gi, '')
-    .trim();
-
-  return html;
-}
-
 function stripInlineStyles(html) {
   html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
   html = html.replace(/\s+style\s*=\s*["'][^"']*["']/gi, '');
@@ -2854,7 +2930,14 @@ async function buildSiloPages() {
       let html = (data.html || data.text || data.content || '').trim();
       if (!html) throw new Error('Empty response');
 
-      html = cleanHTML(html);
+      // Strip any full-page wrapper if returned
+      const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
+      if (fence) html = fence[1].trim();
+      if (html.toLowerCase().includes('<!doctype')) {
+        const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        if (body) html = body[1].trim();
+        else html = html.replace(/<head[\s\S]*?<\/head>/i,'').replace(/<\/?(?:html|body|head)[^>]*>/gi,'').trim();
+      }
 
       if (siloDiviMode) html = stripInlineStyles(html);
       else html = enforceCSSScoping(html);
@@ -3000,7 +3083,7 @@ ABSOLUTE BANS:
 - NEVER use !important
 - NEVER write a selector without the #${scopeId} prefix
 
-STEP 3 — FIRST rule inside the style block MUST be this scoped reset to neutralise
+STEP 3 — FIRST rule inside the style block MUST be this exact scoped reset to neutralise
 any WordPress/Divi/theme global CSS bleeding into the content:
 #${scopeId} {
   all: initial;
@@ -3010,32 +3093,65 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   margin: 0 auto;
   padding: 0 20px 40px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 1rem;
+  font-size: 16px;
   line-height: 1.7;
-  color: #333;
+  color: #333333;
 }
-#${scopeId} * {
+#${scopeId} *, #${scopeId} *::before, #${scopeId} *::after {
   box-sizing: border-box;
 }
-#${scopeId} h1, #${scopeId} h2, #${scopeId} h3,
+#${scopeId} h1 {
+  all: unset;
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #111111;
+  margin: 0 0 0.75em;
+}
+#${scopeId} h2 {
+  all: unset;
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1a1a1a;
+  margin: 1.5em 0 0.5em;
+}
+#${scopeId} h3 {
+  all: unset;
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #222222;
+  margin: 1.2em 0 0.4em;
+}
 #${scopeId} h4, #${scopeId} h5, #${scopeId} h6 {
   all: unset;
   display: block;
-  font-weight: 700;
-  line-height: 1.3;
-  margin: 0.8em 0 0.4em;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #333333;
+  margin: 1em 0 0.3em;
 }
 #${scopeId} p {
   all: unset;
   display: block;
   margin: 0 0 1.2em;
   line-height: 1.7;
+  color: #333333;
+  font-size: 1rem;
 }
 #${scopeId} a {
   all: unset;
   cursor: pointer;
+  color: #2563eb;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
+#${scopeId} a:hover { color: #1d4ed8; }
 #${scopeId} img {
   all: unset;
   display: block;
@@ -3050,10 +3166,14 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   padding-left: 1.6em;
   margin: 0 0 1.2em;
 }
+#${scopeId} ul { list-style: disc; }
+#${scopeId} ol { list-style: decimal; }
 #${scopeId} li {
   all: unset;
   display: list-item;
   margin-bottom: 0.4em;
+  line-height: 1.6;
+  color: #333333;
 }
 #${scopeId} table {
   all: unset;
@@ -3061,21 +3181,82 @@ any WordPress/Divi/theme global CSS bleeding into the content:
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1.5em;
+  font-size: 0.95rem;
 }
 #${scopeId} th, #${scopeId} td {
   all: unset;
   display: table-cell;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border: 1px solid #e2e8f0;
   text-align: left;
+  vertical-align: top;
+}
+#${scopeId} th { font-weight: 600; background: #f8fafc; }
+
+STEP 4 — FAQ ACCORDION — use CSS-only <details>/<summary> — NO JavaScript at all:
+#${scopeId} .wp-seo-faq { margin: 2em 0; }
+#${scopeId} .wp-seo-faq details {
+  all: unset;
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+#${scopeId} .wp-seo-faq details[open] { border-color: #2563eb; }
+#${scopeId} .wp-seo-faq summary {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #111111;
+  cursor: pointer;
+  background: #f9fafb;
+  list-style: none;
+  user-select: none;
+}
+#${scopeId} .wp-seo-faq summary:hover { background: #f1f5f9; }
+#${scopeId} .wp-seo-faq summary::after {
+  content: '+';
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: #6b7280;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+#${scopeId} .wp-seo-faq details[open] summary::after { content: '−'; }
+#${scopeId} .wp-seo-faq .faq-answer {
+  padding: 14px 18px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #374151;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
 }
 
-Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box, FAQ styles etc — all scoped to #${scopeId}
+FAQ HTML STRUCTURE — use exactly this pattern for each Q&A:
+<div class="wp-seo-faq">
+  <details>
+    <summary>Question text here?</summary>
+    <div class="faq-answer"><p>Answer text here.</p></div>
+  </details>
+</div>
+CRITICAL: NEVER use onclick, addEventListener, or any JavaScript for the FAQ.
+CRITICAL: NEVER include a <script> block anywhere — WordPress strips them.
+
+Then AFTER the reset, write ALL your heading sizes, brand colors, CTA box styles etc — all scoped to #${scopeId}
 
 ${brandColorInstruction}
 
 MEDIA QUERIES: scope ALL selectors inside @media too:
-@media (max-width:768px) { #${scopeId} h1 { font-size:1.5rem; } }`;
+@media (max-width:768px) {
+  #${scopeId} h1 { font-size: 1.6rem; }
+  #${scopeId} h2 { font-size: 1.25rem; }
+  #${scopeId} { padding: 0 16px 32px; }
+}`;
 
   const linkBlock = internalLinks.length
     ? `REQUIRED INTERNAL LINKS — embed ALL of these as natural contextual anchor links within the body copy:
@@ -3144,7 +3325,8 @@ SECTION 3 — PAGE BODY CONTENT:
 - EVERY <img> must have alt="[descriptive]" — NEVER omit alt
 - Use https://placehold.co/800x400?text=${slug} for main image
 - Embed ALL required internal links from the section above naturally in body copy
-- FAQ section with 5+ Q&As
+- FAQ section with 5+ Q&As using the <details>/<summary> structure above — NO JavaScript
+- NEVER include a <script> block anywhere — WordPress strips them and breaks the page
 - DO NOT include header/nav/footer/breadcrumb UI/sidebar
 
 ${stylingInstruction}`;
