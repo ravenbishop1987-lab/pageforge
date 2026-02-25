@@ -1785,6 +1785,10 @@ STEP 1 — Wrap ALL content in one outer div:
   ...everything goes here...
 </div>
 
+CRITICAL: Do NOT write any <style> block before this wrapper div.
+Do NOT add any <style> block with body{}, *{}, img{}, a{}, or any unscoped rules anywhere.
+The ONLY <style> block allowed is one that uses exclusively #${scopeId} prefixed selectors.
+
 STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
 CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
 CORRECT:   #${scopeId} .wp-seo-cta { background: #f59e0b; }
@@ -2506,6 +2510,23 @@ function stripInlineStyles(html) {
 
 // Post-processor: enforce CSS scoping — re-prefix any rules missing the scope ID
 function enforceCSSScoping(html) {
+  // Step 1: remove any <style> block that contains unscoped global rules
+  // (body{}, *{}, img{}, a{} etc.) — these are rogue shell styles Claude sometimes adds
+  html = html.replace(/<style>([\s\S]*?)<\/style>/gi, (fullMatch, css) => {
+    // Count how many rules are globally unscoped vs scoped to a #pf- id
+    const rules = css.match(/[^{}]+\{[^{}]*\}/g) || [];
+    const unscopedGlobals = rules.filter(r => {
+      const sel = r.split('{')[0].trim();
+      return /^(body|html|\*|img|a|p|h[1-6]|ul|ol|li)(\s*[,{]|$)/.test(sel) && !sel.includes('#pf-');
+    });
+    // If more than half the rules are unscoped globals, this is a rogue shell block — strip it
+    if (unscopedGlobals.length > 0 && unscopedGlobals.length >= rules.length * 0.4) {
+      return '';
+    }
+    return fullMatch;
+  });
+
+  // Step 2: find scope ID and prefix any remaining unscoped selectors
   const scopeMatch = html.match(/id="(pf-[a-z0-9-]+)"/);
   if (!scopeMatch) return html;
   const sid = scopeMatch[1];
@@ -2942,6 +2963,10 @@ STEP 1 — Wrap ALL content in one outer div:
 <div id="${scopeId}" class="pf-content">
   ...everything goes here...
 </div>
+
+CRITICAL: Do NOT write any <style> block before this wrapper div.
+Do NOT add any <style> block with body{}, *{}, img{}, a{}, or any unscoped rules anywhere.
+The ONLY <style> block allowed is one that uses exclusively #${scopeId} prefixed selectors.
 
 STEP 2 — Write a <style> block BEFORE that wrapper. Every selector MUST start with #${scopeId}:
 CORRECT:   #${scopeId} h1 { color: #1d4ed8; }
