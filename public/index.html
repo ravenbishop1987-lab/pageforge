@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageForge — AI SEO Page Generator</title>
+<script src="https://js.stripe.com/v3/"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --subtle: #9ca3af;
+    --accent: #111827;
+    --success: #16a34a;
+    --error: #dc2626;
+    --warning: #d97706;
+    --mono: 'Geist Mono', monospace;
+    --sans: 'Geist', -apple-system, sans-serif;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  /* ─── VIEWS ─── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ─── TOPBAR ─── */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: #111;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 14px;
+  }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge {
+    font-size: 11px; font-family: var(--mono);
+    background: #f3f4f6; color: var(--muted);
+    padding: 3px 8px; border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .badge.success { background: #f0fdf4; color: var(--success); border-color: #bbf7d0; }
+  .badge.gold { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+
+  /* ─── PRICING PAGE ─── */
+  #view-pricing {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 100px 24px 80px;
+  }
+
+  .pricing-hero {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .pricing-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    background: #f3f4f6;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .pricing-title {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1.05;
+    margin-bottom: 16px;
+  }
+
+  .pricing-sub {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 440px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* ─── PLAN CARDS ─── */
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 48px;
+  }
+
+  @media (max-width: 600px) {
+    .plans { grid-template-columns: 1fr; }
+    .pricing-title { font-size: 32px; }
+  }
+
+  .plan-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  }
+
+  .plan-card:hover {
+    border-color: #999;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.07);
+  }
+
+  .plan-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.08);
+  }
+
+  .plan-card.featured {
+    background: #111;
+    border-color: #111;
+    color: white;
+  }
+
+  .plan-card.featured:hover { border-color: #333; }
+
+  .plan-card.featured .plan-name { color: rgba(255,255,255,0.6); }
+  .plan-card.featured .plan-desc { color: rgba(255,255,255,0.55); }
+  .plan-card.featured .plan-feature { color: rgba(255,255,255,0.8); }
+  .plan-card.featured .plan-feature-check { color: #4ade80; }
+
+  .plan-pill {
+    display: inline-block;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  .plan-pill.monthly { background: #f3f4f6; color: var(--muted); border: 1px solid var(--border); }
+  .plan-pill.lifetime { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.2); }
+
+  .plan-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .plan-price-currency { font-size: 20px; font-weight: 600; margin-top: 6px; }
+  .plan-price-amount { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+  .plan-price-period { font-size: 14px; color: var(--muted); align-self: flex-end; padding-bottom: 6px; }
+  .plan-card.featured .plan-price-period { color: rgba(255,255,255,0.45); }
+
+  .plan-name {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .plan-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .plan-card.featured .plan-desc { border-color: rgba(255,255,255,0.12); }
+
+  .plan-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+
+  .plan-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .plan-feature-check { color: var(--success); font-size: 13px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 11px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    font-family: var(--sans);
+    white-space: nowrap;
+  }
+
+  .btn-primary { background: var(--text); color: white; border-color: var(--text); width: 100%; justify-content: center; }
+  .btn-primary:hover { background: #333; border-color: #333; }
+
+  .btn-outline { background: transparent; color: #111; border-color: rgba(255,255,255,0.3); width: 100%; justify-content: center; border-color: rgba(255,255,255,0.4); color: white; }
+  .btn-outline:hover { background: rgba(255,255,255,0.1); }
+
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { border-color: #999; }
+
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-loading { opacity: 0.7; cursor: wait; }
+
+  /* ─── FEATURES GRID ─── */
+  .features-section { margin-top: 64px; }
+
+  .features-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 32px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .features-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .feature-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+  }
+
+  .feature-tile-icon { font-size: 22px; margin-bottom: 10px; }
+  .feature-tile-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .feature-tile-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ─── SUCCESS PAGE ─── */
+  #view-success {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 120px 24px;
+    text-align: center;
+  }
+
+  .success-icon {
+    width: 64px; height: 64px;
+    background: #f0fdf4;
+    border: 2px solid #bbf7d0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin: 0 auto 24px;
+  }
+
+  .success-title { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; }
+  .success-sub { font-size: 15px; color: var(--muted); line-height: 1.6; margin-bottom: 32px; }
+
+  .success-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: left;
+    margin-bottom: 24px;
+  }
+
+  .success-card-label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .success-card-value { font-size: 14px; font-weight: 500; }
+
+  /* ─── APP VIEW ─── */
+  #view-app {
+    padding-top: 56px;
+    min-height: 100vh;
+  }
+
+  .app-layout {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* ─── STEP FLOW ─── */
+  .steps { display: flex; flex-direction: column; }
+
+  .step { display: flex; gap: 0; position: relative; }
+
+  .step-left {
+    display: flex; flex-direction: column; align-items: center;
+    width: 40px; flex-shrink: 0;
+  }
+
+  .step-circle {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    flex-shrink: 0; transition: all 0.2s; z-index: 1;
+  }
+
+  .step.active .step-circle { border-color: var(--accent); background: var(--accent); color: white; }
+  .step.done .step-circle { border-color: var(--success); background: #f0fdf4; color: var(--success); }
+
+  .step-line {
+    width: 1.5px; flex: 1; background: var(--border);
+    margin: 4px 0; min-height: 20px;
+  }
+
+  .step-right { flex: 1; padding: 2px 0 32px 16px; }
+  .step:last-child .step-right { padding-bottom: 0; }
+  .step:last-child .step-line { display: none; }
+
+  .step-header {
+    display: flex; align-items: center; gap: 8px;
+    height: 30px; cursor: pointer; margin-bottom: 2px;
+  }
+
+  .step-title { font-size: 14px; font-weight: 600; color: var(--muted); transition: color 0.2s; }
+  .step.active .step-title, .step.done .step-title { color: var(--text); }
+
+  .step-summary {
+    display: none; font-size: 11px; color: var(--muted);
+    font-family: var(--mono); margin-bottom: 0;
+  }
+
+  .step.done .step-summary { display: block; }
+
+  .step-content { display: none; }
+  .step.active .step-content { display: block; padding-top: 14px; }
+
+  .step-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+
+  .edit-btn {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+    cursor: pointer; padding: 2px 7px;
+    border-radius: 4px; background: #f3f4f6;
+    border: 1px solid var(--border); font-family: var(--mono);
+    display: none; transition: all 0.1s;
+  }
+
+  .step.done .edit-btn { display: inline-flex; align-items: center; }
+  .edit-btn:hover { border-color: #999; color: var(--text); }
+
+  /* ─── FORM ─── */
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+
+  label {
+    display: block; font-size: 13px; font-weight: 500;
+    margin-bottom: 6px; color: var(--text);
+  }
+
+  .label-hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+
+  input[type="text"], input[type="password"],
+  input[type="email"], textarea, select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    -webkit-appearance: none;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  }
+
+  textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+  .char-count {
+    font-size: 11px; font-family: var(--mono); margin-top: 5px; color: var(--muted);
+  }
+
+  .char-count .n { font-weight: 600; }
+  .char-count .n.good { color: var(--success); }
+  .char-count .n.warn { color: var(--warning); }
+  .char-count .n.bad { color: var(--error); }
+
+  /* api key row */
+  .api-key-row { position: relative; }
+  .api-key-row input { padding-right: 72px; font-family: var(--mono); font-size: 13px; }
+
+  .toggle-vis {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; color: var(--muted); cursor: pointer;
+    background: #f3f4f6; border: 1px solid var(--border);
+    padding: 2px 7px; border-radius: 4px; font-family: var(--mono);
+    user-select: none;
+  }
+
+  /* keyword tags */
+  .kw-tags {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 8px; min-height: 46px; background: var(--surface);
+    cursor: text; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .kw-tags:focus-within {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  }
+
+  .kw-tag {
+    display: flex; align-items: center; gap: 4px;
+    background: #f3f4f6; border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px;
+    font-size: 12px; font-family: var(--mono); color: var(--text);
+  }
+
+  .kw-tag-x {
+    cursor: pointer; color: var(--subtle); font-size: 14px; line-height: 1;
+  }
+
+  .kw-tag-x:hover { color: var(--error); }
+
+  .kw-input {
+    border: none; outline: none; font-size: 13px;
+    font-family: var(--sans); min-width: 100px; flex: 1;
+    background: transparent; color: var(--text);
+  }
+
+  /* chips */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    font-size: 12px; font-family: var(--mono);
+    padding: 5px 10px; border-radius: 20px;
+    border: 1px solid var(--border); background: #f3f4f6;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+    user-select: none;
+  }
+
+  .chip:hover { border-color: #999; color: var(--text); }
+  .chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* slider */
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .slider-val { font-family: var(--mono); font-size: 13px; font-weight: 600; min-width: 80px; text-align: right; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* step nav */
+  .step-nav { margin-top: 20px; }
+  .step-nav .btn { padding: 12px; font-size: 14px; }
+
+  /* config summary */
+  .config-summary {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 16px; margin-bottom: 20px;
+  }
+
+  .config-row {
+    display: grid; grid-template-columns: 130px 1fr;
+    gap: 4px 12px; font-size: 13px; line-height: 2;
+  }
+
+  .config-key { color: var(--muted); }
+  .config-val { font-weight: 500; }
+
+  /* ─── LOADING OVERLAY ─── */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(250,250,250,0.96); backdrop-filter: blur(4px);
+    z-index: 300; align-items: center; justify-content: center;
+  }
+
+  .loading-overlay.active { display: flex; }
+
+  .loading-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 480px; max-width: 90vw;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.08);
+  }
+
+  .loading-top {
+    display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+  }
+
+  .spinner {
+    width: 38px; height: 38px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.75s linear infinite; flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-headline { font-size: 15px; font-weight: 600; }
+  .loading-kw-label { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+  .progress-track {
+    height: 2px; background: var(--border); border-radius: 99px;
+    overflow: hidden; margin-bottom: 24px;
+  }
+
+  .progress-fill {
+    height: 100%; background: var(--accent);
+    border-radius: 99px; transition: width 0.6s ease; width: 0%;
+  }
+
+  .lsteps { display: flex; flex-direction: column; gap: 0; }
+
+  .lstep {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    opacity: 0.35; transition: opacity 0.3s;
+  }
+
+  .lstep:last-child { border-bottom: none; }
+  .lstep.active { opacity: 1; }
+  .lstep.done { opacity: 0.65; }
+
+  .lstep-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px; transition: all 0.3s;
+    font-size: 9px;
+  }
+
+  .lstep.active .lstep-dot {
+    border-color: var(--accent); background: var(--accent);
+  }
+
+  .lstep.active .lstep-dot::after {
+    content: ''; width: 5px; height: 5px;
+    background: white; border-radius: 50%;
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .lstep.done .lstep-dot {
+    border-color: var(--success); background: var(--success); color: white;
+    font-size: 10px;
+  }
+
+  .lstep.done .lstep-dot::after { content: '✓'; font-weight: 700; color: white; }
+
+  .lstep-label { font-size: 13px; font-weight: 500; }
+  .lstep-sub { font-size: 11px; color: var(--muted); margin-top: 1px; font-family: var(--mono); }
+
+  .loading-footer {
+    margin-top: 18px; display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--subtle); font-family: var(--mono);
+  }
+
+  /* ─── RESULT CARD ─── */
+  .result-section { display: none; margin-top: 40px; }
+  .result-section.visible { display: block; }
+
+  .result-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+
+  .result-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+
+  .result-title { font-size: 14px; font-weight: 600; }
+
+  .result-actions { display: flex; gap: 8px; align-items: center; }
+
+  .result-tabs {
+    display: flex; border-bottom: 1px solid var(--border); padding: 0 20px;
+  }
+
+  .rtab {
+    padding: 10px 14px; font-size: 12px; font-weight: 500;
+    color: var(--muted); cursor: pointer; border: none; background: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all 0.15s; font-family: var(--sans);
+  }
+
+  .rtab:hover { color: var(--text); }
+  .rtab.active { color: var(--text); border-bottom-color: var(--text); }
+
+  .rtab-panel { display: none; }
+  .rtab-panel.active { display: block; }
+
+  .browser-bar {
+    background: #f9fafb; padding: 9px 16px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bdots { display: flex; gap: 5px; }
+  .bdot { width: 10px; height: 10px; border-radius: 50%; }
+  .url-pill {
+    flex: 1; background: white; border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 10px;
+    font-size: 11px; font-family: var(--mono); color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  iframe#previewFrame { width: 100%; height: 500px; border: none; display: block; background: white; }
+
+  /* score */
+  .score-panel { padding: 20px; }
+
+  .score-big {
+    display: flex; align-items: center; gap: 20px;
+    padding: 20px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    margin-bottom: 20px;
+  }
+
+  .score-ring { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+  .score-ring svg { transform: rotate(-90deg); }
+
+  .score-ring-center {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-family: var(--mono);
+    font-size: 18px; font-weight: 700;
+  }
+
+  .score-label { font-size: 18px; font-weight: 700; }
+  .score-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .rules-list { display: flex; flex-direction: column; gap: 1px; }
+
+  .rule-row {
+    display: flex; align-items: center; gap: 8px; padding: 7px 0;
+    font-size: 12px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rule-row:last-child { border-bottom: none; }
+  .rule-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .rule-row.pass { color: var(--text); }
+  .rule-row.pass .rule-dot { background: var(--success); }
+  .rule-row.fail .rule-dot { background: var(--error); }
+
+  /* code */
+  .code-toolbar {
+    padding: 10px 16px; display: flex; align-items: center;
+    justify-content: space-between; border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .code-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  pre {
+    margin: 0; padding: 20px; font-family: var(--mono);
+    font-size: 11px; line-height: 1.7; color: #374151;
+    max-height: 420px; overflow: auto;
+    white-space: pre-wrap; word-break: break-all; background: var(--bg);
+  }
+
+  /* ─── TOAST ─── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--text); color: white;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; z-index: 999;
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--error); }
+  .toast.success { background: var(--success); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">⚡</div>
+    PageForge
+  </div>
+  <div class="topbar-right" id="topbarRight">
+    <!-- Populated by JS -->
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     VIEW: PRICING
+═════════════════════════════════════════════════════════════ -->
+<div class="view active" id="view-pricing">
+  <div id="view-pricing-inner">
+
+    <div class="pricing-hero">
+      <div class="pricing-eyebrow">⚡ Powered by Claude AI</div>
+      <h1 class="pricing-title">SEO pages that<br>rank. Instantly.</h1>
+      <p class="pricing-sub">Generate WordPress-ready, fully optimized HTML pages with schema markup, meta tags, and a 20-point SEO audit — in under 30 seconds.</p>
+    </div>
+
+    <div class="plans">
+
+      <!-- Monthly -->
+      <div class="plan-card" onclick="selectPlan('monthly')">
+        <div class="plan-pill monthly">Monthly</div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount">12</span>
+          <span class="plan-price-period">/month</span>
+        </div>
+        <div class="plan-name">Pro Monthly</div>
+        <div class="plan-desc">Full access, cancel anytime. Perfect if you want to try it out first.</div>
+        <div class="plan-features">
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Unlimited page generations</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> 20-point SEO score &amp; rules</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Full schema markup (JSON-LD)</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> WordPress-ready HTML output</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Cancel anytime</div>
+        </div>
+        <button class="btn btn-primary" onclick="startCheckout('monthly', event)">
+          Get started →
+        </button>
+      </div>
+
+      <!-- Lifetime (featured) -->
+      <div class="plan-card featured" onclick="selectPlan('lifetime')">
+        <div class="plan-pill lifetime">Best value</div>
+        <div class="plan-price">
+          <span class="plan-price-currency">$</span>
+          <span class="plan-price-amount">49</span>
+          <span class="plan-price-period">one-time</span>
+        </div>
+        <div class="plan-name" style="color:rgba(255,255,255,0.5);">Lifetime Access</div>
+        <div class="plan-desc">Pay once, use forever. Saves $144/year vs monthly.</div>
+        <div class="plan-features">
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Everything in Monthly</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Lifetime access, no renewals</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> All future updates included</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Priority support</div>
+          <div class="plan-feature"><span class="plan-feature-check">✓</span> Saves $144/year</div>
+        </div>
+        <button class="btn btn-outline" onclick="startCheckout('lifetime', event)">
+          Get lifetime access →
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Already have access -->
+    <div style="text-align:center;margin-bottom:48px;">
+      <span style="font-size:13px;color:var(--muted);">Already have access? </span>
+      <span style="font-size:13px;color:var(--text);font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="showRestoreAccess()">Sign in →</span>
+    </div>
+
+    <!-- Features -->
+    <div class="features-section">
+      <div class="features-title">Everything you need to rank</div>
+      <div class="features-grid">
+        <div class="feature-tile">
+          <div class="feature-tile-icon">🎯</div>
+          <div class="feature-tile-title">20-Point SEO Audit</div>
+          <div class="feature-tile-desc">Real-time scoring against 20 on-page SEO rules, from meta tags to schema.</div>
+        </div>
+        <div class="feature-tile">
+          <div class="feature-tile-icon">🧩</div>
+          <div class="feature-tile-title">Full Schema Markup</div>
+          <div class="feature-tile-desc">Article, FAQPage, BreadcrumbList, HowTo, Product, and more — as JSON-LD.</div>
+        </div>
+        <div class="feature-tile">
+          <div class="feature-tile-icon">⚡</div>
+          <div class="feature-tile-title">Claude AI Powered</div>
+          <div class="feature-tile-desc">Anthropic's Claude writes detailed, original content that reads like a human expert.</div>
+        </div>
+        <div class="feature-tile">
+          <div class="feature-tile-icon">📋</div>
+          <div class="feature-tile-title">WordPress-Ready</div>
+          <div class="feature-tile-desc">Output is WordPress body HTML — paste directly into the classic editor or Gutenberg.</div>
+        </div>
+        <div class="feature-tile">
+          <div class="feature-tile-icon">📊</div>
+          <div class="feature-tile-title">Live Preview</div>
+          <div class="feature-tile-desc">See exactly how your page renders before downloading or copying.</div>
+        </div>
+        <div class="feature-tile">
+          <div class="feature-tile-icon">🔒</div>
+          <div class="feature-tile-title">Your API Key</div>
+          <div class="feature-tile-desc">Bring your own Claude API key. It stays client-side — we never store it.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     VIEW: SUCCESS
+═════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-success">
+  <div style="max-width:480px;margin:0 auto;padding:120px 24px;text-align:center;">
+    <div class="success-icon">✅</div>
+    <h2 class="success-title">You're all set!</h2>
+    <p class="success-sub" id="successSub">Your access has been activated. Start generating SEO pages below.</p>
+
+    <div class="success-card" id="successCard" style="display:none;">
+      <div class="config-row">
+        <div class="config-key">Email</div><div class="config-val" id="successEmail">—</div>
+        <div class="config-key">Plan</div><div class="config-val" id="successPlan">—</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="max-width:300px;margin:0 auto;" onclick="enterApp()">
+      Open PageForge →
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     VIEW: APP
+═════════════════════════════════════════════════════════════ -->
+<div class="view" id="view-app">
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="loading-top">
+        <div class="spinner"></div>
+        <div>
+          <div class="loading-headline">Generating your SEO page</div>
+          <div class="loading-kw-label" id="loadingKw">Powered by Claude AI</div>
+        </div>
+      </div>
+
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="lsteps">
+        <div class="lstep" id="ls1">
+          <div class="lstep-dot"></div>
+          <div><div class="lstep-label">Analyzing keyword strategy</div><div class="lstep-sub">semantic mapping & intent</div></div>
+        </div>
+        <div class="lstep" id="ls2">
+          <div class="lstep-dot"></div>
+          <div><div class="lstep-label">Generating SEO content</div><div class="lstep-sub">writing body copy & headings</div></div>
+        </div>
+        <div class="lstep" id="ls3">
+          <div class="lstep-dot"></div>
+          <div><div class="lstep-label">Building schema markup</div><div class="lstep-sub">JSON-LD, FAQ & BreadcrumbList</div></div>
+        </div>
+        <div class="lstep" id="ls4">
+          <div class="lstep-dot"></div>
+          <div><div class="lstep-label">Applying 20 SEO rules</div><div class="lstep-sub">meta tags, OG, Twitter Card, alts</div></div>
+        </div>
+        <div class="lstep" id="ls5">
+          <div class="lstep-dot"></div>
+          <div><div class="lstep-label">Finalizing design & CSS</div><div class="lstep-sub">responsive layout & styles</div></div>
+        </div>
+      </div>
+
+      <div class="loading-footer">
+        <span id="loadingStepLabel">Starting up...</span>
+        <span id="loadingTimer">0s</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+
+    <div style="margin-bottom:40px;">
+      <h2 style="font-size:24px;font-weight:800;letter-spacing:-0.75px;margin-bottom:6px;">Generate a page</h2>
+      <p style="font-size:14px;color:var(--muted);">Fill in the steps below to build your SEO-optimized WordPress page.</p>
+    </div>
+
+    <div class="steps" id="stepsContainer">
+
+      <!-- STEP 1: API Key -->
+      <div class="step active" id="s1">
+        <div class="step-left">
+          <div class="step-circle">1</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-right">
+          <div class="step-header" onclick="editStep(1)">
+            <div class="step-title">Connect your Claude API key</div>
+            <span class="edit-btn" onclick="editStep(1)">Edit</span>
+          </div>
+          <div class="step-summary" id="sum1"></div>
+          <div class="step-content">
+            <div class="step-subtitle">Used client-side only — we never store your key.</div>
+            <div class="field">
+              <label>Claude API Key</label>
+              <div class="api-key-row">
+                <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off" oninput="onApiKey()">
+                <span class="toggle-vis" onclick="toggleKey()">Show</span>
+              </div>
+              <div class="hint">Get yours at <a href="https://console.anthropic.com" target="_blank" style="color:var(--text);text-decoration:underline;text-underline-offset:2px;">console.anthropic.com</a></div>
+            </div>
+            <div class="step-nav">
+              <button class="btn btn-primary" onclick="nextStep(1)">Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Keywords -->
+      <div class="step" id="s2">
+        <div class="step-left">
+          <div class="step-circle">2</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-right">
+          <div class="step-header" onclick="editStep(2)">
+            <div class="step-title">Target keywords</div>
+            <span class="edit-btn">Edit</span>
+          </div>
+          <div class="step-summary" id="sum2"></div>
+          <div class="step-content">
+            <div class="step-subtitle">Your focus keyword is the primary term you want to rank for.</div>
+            <div class="field">
+              <label>Focus Keyword</label>
+              <input type="text" id="focusKw" placeholder="e.g. CBD oil benefits" oninput="onFocusKw()">
+            </div>
+            <div class="field">
+              <label>Secondary Keywords <span class="label-hint">— Enter or comma to add</span></label>
+              <div class="kw-tags" id="kwTags" onclick="document.getElementById('kwIn').focus()">
+                <input class="kw-input" id="kwIn" placeholder="Add keywords...">
+              </div>
+            </div>
+            <div class="field">
+              <label>Page Type</label>
+              <select id="pageType">
+                <option value="pillar">Pillar / Educational Article</option>
+                <option value="product">Product Page</option>
+                <option value="landing">Landing Page</option>
+                <option value="blog">Blog Post</option>
+                <option value="local">Local Business Page</option>
+                <option value="faq">FAQ Page</option>
+                <option value="comparison">Comparison Page</option>
+              </select>
+            </div>
+            <div class="step-nav">
+              <button class="btn btn-primary" onclick="nextStep(2)">Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Settings -->
+      <div class="step" id="s3">
+        <div class="step-left">
+          <div class="step-circle">3</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-right">
+          <div class="step-header" onclick="editStep(3)">
+            <div class="step-title">Page settings</div>
+            <span class="edit-btn">Edit</span>
+          </div>
+          <div class="step-summary" id="sum3"></div>
+          <div class="step-content">
+            <div class="step-subtitle">Configure how the page should be generated.</div>
+            <div class="two-col">
+              <div class="field">
+                <label>Site Name</label>
+                <input type="text" id="siteName" placeholder="My Website">
+              </div>
+              <div class="field">
+                <label>Tone</label>
+                <select id="tone">
+                  <option value="professional">Professional</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="medical">Medical / Clinical</option>
+                  <option value="technical">Technical</option>
+                  <option value="marketing">Marketing</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Page Title <span class="label-hint">— ideal 50–65 chars</span></label>
+              <input type="text" id="pageTitle" placeholder="CBD Oil Benefits: Complete Guide | My Site" oninput="onTitle()">
+              <div class="char-count"><span class="n" id="titleN">0</span> chars · ideal 50–65</div>
+            </div>
+            <div class="field">
+              <label>Target URL</label>
+              <input type="text" id="targetUrl" placeholder="https://example.com/page/">
+            </div>
+            <div class="field">
+              <label>Word Count</label>
+              <div class="slider-row">
+                <input type="range" id="wordCount" min="300" max="5000" step="100" value="1000" oninput="onWC()">
+                <span class="slider-val" id="wcVal">1,000 words</span>
+              </div>
+              <div class="hint" id="wcHint">Good for most blog posts and landing pages.</div>
+            </div>
+            <div class="field">
+              <label>Schema Types</label>
+              <div class="chip-row" id="schemaChips">
+                <div class="chip active" data-s="Article">Article</div>
+                <div class="chip active" data-s="FAQPage">FAQ</div>
+                <div class="chip active" data-s="BreadcrumbList">Breadcrumb</div>
+                <div class="chip" data-s="HowTo">HowTo</div>
+                <div class="chip" data-s="Product">Product</div>
+                <div class="chip" data-s="LocalBusiness">LocalBusiness</div>
+                <div class="chip" data-s="Review">Review</div>
+              </div>
+            </div>
+            <div class="step-nav">
+              <button class="btn btn-primary" onclick="nextStep(3)">Continue →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Generate -->
+      <div class="step" id="s4">
+        <div class="step-left">
+          <div class="step-circle">4</div>
+        </div>
+        <div class="step-right">
+          <div class="step-header">
+            <div class="step-title">Generate</div>
+          </div>
+          <div class="step-content">
+            <div class="step-subtitle">Review your setup, then generate. Claude will write a fully SEO-optimized WordPress page.</div>
+            <div class="config-summary" id="configSummary"></div>
+            <button class="btn btn-primary" onclick="generatePage()" id="genBtn" style="font-size:15px;padding:14px;">
+              ⚡ Generate SEO Page
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RESULT -->
+    <div class="result-section" id="resultSection">
+      <div class="result-card">
+        <div class="result-header">
+          <div class="result-title">Generated Page</div>
+          <div class="result-actions">
+            <span style="font-size:12px;color:var(--muted);font-family:var(--mono);" id="scoreBadge"></span>
+            <button class="btn btn-secondary btn-sm" onclick="downloadPage()">⬇ Download</button>
+            <button class="btn btn-secondary btn-sm" onclick="copyCode()">⎘ Copy</button>
+          </div>
+        </div>
+
+        <div class="result-tabs">
+          <button class="rtab active" onclick="rTab('preview',this)">Preview</button>
+          <button class="rtab" onclick="rTab('score',this)">SEO Score</button>
+          <button class="rtab" onclick="rTab('code',this)">Code</button>
+        </div>
+
+        <div class="rtab-panel active" id="rp-preview">
+          <div class="browser-bar">
+            <div class="bdots">
+              <div class="bdot" style="background:#ff5f57"></div>
+              <div class="bdot" style="background:#ffbd2e"></div>
+              <div class="bdot" style="background:#28c840"></div>
+            </div>
+            <div class="url-pill" id="previewUrl">about:blank</div>
+            <button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:11px;" onclick="openNew()">↗</button>
+          </div>
+          <iframe id="previewFrame"></iframe>
+        </div>
+
+        <div class="rtab-panel" id="rp-score">
+          <div class="score-panel">
+            <div class="score-big">
+              <div class="score-ring">
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <circle cx="36" cy="36" r="28" fill="none" stroke="var(--border)" stroke-width="5"/>
+                  <circle id="scoreCircle" cx="36" cy="36" r="28" fill="none" stroke="#111" stroke-width="5"
+                    stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke-linecap="round"
+                    style="transition:stroke-dashoffset 1s ease, stroke 0.5s"/>
+                </svg>
+                <div class="score-ring-center" id="scoreNum">—</div>
+              </div>
+              <div>
+                <div class="score-label" id="scoreLabel">—</div>
+                <div class="score-sub" id="scoreSub">Generate a page to see your score</div>
+              </div>
+            </div>
+            <div class="rules-list" id="rulesList"></div>
+          </div>
+        </div>
+
+        <div class="rtab-panel" id="rp-code">
+          <div class="code-toolbar">
+            <span class="code-meta" id="codeMeta">0 lines</span>
+            <button class="btn btn-secondary btn-sm" onclick="copyCode()">Copy</button>
+          </div>
+          <pre id="codeBlock"></pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let session = { email: null, plan: null, accessToken: null };
+let secKws = [];
+let schemas = ['Article', 'FAQPage', 'BreadcrumbList'];
+let generatedHTML = '';
+let currentStep = 1;
+
+const SEO_RULES = [
+  { id: 'title',    label: 'Page title (50–65 chars)',           check: d => d.titleLen >= 50 && d.titleLen <= 65 },
+  { id: 'metaDesc', label: 'Meta description (120–160 chars)',   check: d => d.metaLen >= 120 && d.metaLen <= 160 },
+  { id: 'metaKw',   label: 'Keyword in meta description',       check: d => d.metaHasKw },
+  { id: 'h1',       label: 'Single H1 tag',                     check: d => d.h1Count === 1 },
+  { id: 'h1kw',     label: 'Focus keyword in H1',               check: d => d.h1HasKw },
+  { id: 'h2s',      label: '5+ H2 subheadings',                 check: d => d.h2Count >= 5 },
+  { id: 'firstP',   label: 'Keyword in first paragraph',        check: d => d.firstParaHasKw },
+  { id: 'canon',    label: 'Canonical URL present',             check: d => d.hasCanonical },
+  { id: 'schema',   label: 'JSON-LD schema markup',             check: d => d.hasSchema },
+  { id: 'faqSch',   label: 'FAQPage schema included',           check: d => d.hasFaqSchema },
+  { id: 'bc',       label: 'BreadcrumbList schema',             check: d => d.hasBreadcrumb },
+  { id: 'imgAlts',  label: 'All images have alt attributes',    check: d => d.imgsMissingAlt === 0 },
+  { id: 'og',       label: 'Open Graph tags',                   check: d => d.hasOg },
+  { id: 'tw',       label: 'Twitter Card tags',                 check: d => d.hasTwitter },
+  { id: 'wc',       label: 'Meets target word count',           check: d => d.wordCount >= (window._wc || 1000) },
+  { id: 'links',    label: '3+ internal anchor links',          check: d => d.internalLinks >= 3 },
+  { id: 'faq',      label: 'FAQ section (5+ Q&As)',             check: d => d.faqCount >= 5 },
+  { id: 'flow',     label: 'No skipped heading levels',         check: d => d.headingFlowOk },
+  { id: 'secKws',   label: 'Secondary keywords used',           check: d => d.secKwUsed },
+  { id: 'style',    label: 'Scoped CSS styles',                 check: d => d.hasStyle },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  renderRules();
+  initSchemaChips();
+  onWC();
+
+  // Keyword input
+  const kwIn = document.getElementById('kwIn');
+  kwIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const v = kwIn.value.replace(/,$/,'').trim();
+      if (v && !secKws.includes(v)) { secKws.push(v); renderKwTags(); }
+      kwIn.value = '';
+    }
+    if (e.key === 'Backspace' && !kwIn.value && secKws.length) {
+      secKws.pop(); renderKwTags();
+    }
+  });
+
+  // Check for Stripe redirect
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('session_id')) {
+    verifyStripeSession(params.get('session_id'));
+    return;
+  }
+
+  if (params.get('cancelled')) {
+    showToast('error', 'Checkout cancelled — choose a plan to continue.');
+  }
+
+  // Check stored access
+  const stored = loadSession();
+  if (stored) {
+    session = stored;
+    enterApp();
+  } else {
+    showView('pricing');
+    updateTopbar();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// VIEWS
+// ═══════════════════════════════════════════════════════════════════
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function updateTopbar() {
+  const el = document.getElementById('topbarRight');
+  if (session.email) {
+    const planLabel = session.plan === 'lifetime' ? '🏆 Lifetime' : '📅 Monthly';
+    el.innerHTML = `
+      <span class="badge ${session.plan === 'lifetime' ? 'gold' : 'success'}">${planLabel}</span>
+      <span style="font-size:13px;color:var(--muted);">${session.email}</span>
+      <button class="btn btn-secondary btn-sm" onclick="manageSubscription()">Manage</button>
+    `;
+  } else {
+    el.innerHTML = `<button class="btn btn-primary btn-sm" onclick="showView('pricing')">Get access →</button>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STRIPE CHECKOUT
+// ═══════════════════════════════════════════════════════════════════
+async function startCheckout(plan, event) {
+  if (event) event.stopPropagation();
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
+
+  try {
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create checkout session');
+
+    // Redirect to Stripe Checkout
+    window.location.href = data.url;
+
+  } catch (err) {
+    showToast('error', err.message);
+    if (btn) { btn.disabled = false; btn.textContent = plan === 'monthly' ? 'Get started →' : 'Get lifetime access →'; }
+  }
+}
+
+// ─── Called after Stripe redirects back with ?session_id= ───────
+async function verifyStripeSession(sessionId) {
+  showView('success');
+  document.getElementById('successSub').textContent = 'Verifying your payment...';
+
+  try {
+    const res = await fetch('/api/stripe/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    session = { email: data.email, plan: data.plan, accessToken: data.accessToken };
+    saveSession(session);
+
+    document.getElementById('successSub').textContent = 'Your access has been activated. Welcome to PageForge!';
+    document.getElementById('successCard').style.display = 'block';
+    document.getElementById('successEmail').textContent = data.email;
+    document.getElementById('successPlan').textContent = data.plan === 'lifetime' ? '🏆 Lifetime Access' : '📅 Pro Monthly';
+
+    // Clean URL
+    history.replaceState({}, '', '/');
+    updateTopbar();
+
+  } catch (err) {
+    document.getElementById('successSub').textContent = '⚠️ Could not verify payment: ' + err.message;
+  }
+}
+
+function enterApp() {
+  updateTopbar();
+  showView('app');
+}
+
+// ─── Restore access by email ─────────────────────────────────────
+function showRestoreAccess() {
+  const email = prompt('Enter the email you used to purchase:');
+  if (!email) return;
+  restoreByEmail(email.trim().toLowerCase());
+}
+
+async function restoreByEmail(email) {
+  try {
+    const res = await fetch('/api/stripe/check-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+
+    if (data.access) {
+      session = { email, plan: data.plan, accessToken: null };
+      saveSession(session);
+      showToast('success', `Welcome back! ${data.plan === 'lifetime' ? 'Lifetime' : 'Monthly'} access restored.`);
+      enterApp();
+    } else {
+      showToast('error', 'No active subscription found for that email.');
+    }
+  } catch(err) {
+    showToast('error', 'Could not verify access: ' + err.message);
+  }
+}
+
+// ─── Manage subscription (Stripe portal) ────────────────────────
+async function manageSubscription() {
+  if (!session.email) return;
+  try {
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: session.email })
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else showToast('error', data.error || 'Could not open portal');
+  } catch(err) {
+    showToast('error', err.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION STORAGE (localStorage for convenience)
+// ═══════════════════════════════════════════════════════════════════
+function saveSession(s) {
+  try { localStorage.setItem('pf_session', JSON.stringify(s)); } catch(e) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem('pf_session');
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return s?.email ? s : null;
+  } catch(e) { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STEP FLOW
+// ═══════════════════════════════════════════════════════════════════
+function goToStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('s' + i);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    if (i === n) el.classList.add('active');
+  }
+  currentStep = n;
+  if (n === 4) buildConfigSummary();
+}
+
+function editStep(n) { if (currentStep > n) goToStep(n); }
+
+function nextStep(n) {
+  if (n === 1) {
+    const key = document.getElementById('apiKey').value.trim();
+    if (!key.startsWith('sk-ant-')) { showToast('error', 'Enter a valid Claude API key (starts with sk-ant-)'); return; }
+    document.getElementById('sum1').textContent = '••••••••••••• connected';
+    goToStep(2);
+  } else if (n === 2) {
+    const kw = document.getElementById('focusKw').value.trim();
+    if (!kw) { showToast('error', 'Please enter a focus keyword'); return; }
+    const type = document.getElementById('pageType').selectedOptions[0].text;
+    const sec = secKws.length ? ` + ${secKws.length} secondary` : '';
+    document.getElementById('sum2').textContent = `"${kw}"${sec} · ${type}`;
+    goToStep(3);
+  } else if (n === 3) {
+    const wc = parseInt(document.getElementById('wordCount').value);
+    const tone = document.getElementById('tone').selectedOptions[0].text;
+    document.getElementById('sum3').textContent = `${wc.toLocaleString()} words · ${tone} · ${schemas.length} schemas`;
+    goToStep(4);
+  }
+  setTimeout(() => document.getElementById('s' + (n+1)).scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FORM HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function onApiKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  const badge = document.getElementById('topbarRight').querySelector('.badge');
+  // update badge if in app
+}
+
+function toggleKey() {
+  const inp = document.getElementById('apiKey');
+  const btn = document.querySelector('.toggle-vis');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? 'Show' : 'Hide';
+}
+
+function onFocusKw() {
+  const kw = document.getElementById('focusKw').value.trim();
+  if (!document.getElementById('targetUrl').value) {
+    document.getElementById('targetUrl').value = kw
+      ? `https://example.com/${kw.toLowerCase().replace(/\s+/g,'-')}/` : '';
+  }
+}
+
+function onTitle() {
+  const len = document.getElementById('pageTitle').value.length;
+  const el = document.getElementById('titleN');
+  el.textContent = len;
+  el.className = 'n ' + (len >= 50 && len <= 65 ? 'good' : len > 0 && len < 50 ? 'warn' : len > 65 ? 'bad' : '');
+}
+
+function onWC() {
+  const v = parseInt(document.getElementById('wordCount').value);
+  document.getElementById('wcVal').textContent = v.toLocaleString() + ' words';
+  document.getElementById('wcHint').textContent = v < 600
+    ? 'Thin page — good for quick FAQs or local pages.'
+    : v < 1500 ? 'Good for most blog posts and landing pages.'
+    : v < 3000 ? 'Ideal for pillar pages and comprehensive guides.'
+    : 'Deep-dive content for topical authority building.';
+}
+
+function renderKwTags() {
+  const cont = document.getElementById('kwTags');
+  const inp = document.getElementById('kwIn');
+  cont.innerHTML = '';
+  secKws.forEach((kw, i) => {
+    const t = document.createElement('span');
+    t.className = 'kw-tag';
+    t.innerHTML = `${kw}<span class="kw-tag-x" onclick="removeKw(${i})">×</span>`;
+    cont.appendChild(t);
+  });
+  cont.appendChild(inp);
+  inp.focus();
+}
+
+function removeKw(i) { secKws.splice(i, 1); renderKwTags(); }
+
+function initSchemaChips() {
+  document.querySelectorAll('#schemaChips .chip').forEach(c => {
+    c.addEventListener('click', () => {
+      c.classList.toggle('active');
+      const s = c.dataset.s;
+      if (c.classList.contains('active')) { if (!schemas.includes(s)) schemas.push(s); }
+      else schemas = schemas.filter(x => x !== s);
+    });
+  });
+}
+
+function buildConfigSummary() {
+  const kw = document.getElementById('focusKw').value.trim();
+  const type = document.getElementById('pageType').selectedOptions[0].text;
+  const site = document.getElementById('siteName').value || 'My Website';
+  const tone = document.getElementById('tone').selectedOptions[0].text;
+  const wc = parseInt(document.getElementById('wordCount').value);
+  const url = document.getElementById('targetUrl').value || `https://example.com/${kw.toLowerCase().replace(/\s+/g,'-')}/`;
+
+  document.getElementById('configSummary').innerHTML = `<div class="config-row">
+    <span class="config-key">Focus keyword</span><span class="config-val">${kw}</span>
+    <span class="config-key">Secondary</span><span class="config-val">${secKws.length ? secKws.join(', ') : '—'}</span>
+    <span class="config-key">Page type</span><span class="config-val">${type}</span>
+    <span class="config-key">Site</span><span class="config-val">${site}</span>
+    <span class="config-key">Tone</span><span class="config-val">${tone}</span>
+    <span class="config-key">Words</span><span class="config-val">${wc.toLocaleString()}+ words</span>
+    <span class="config-key">Schemas</span><span class="config-val">${schemas.join(', ')}</span>
+    <span class="config-key">URL</span><span class="config-val" style="font-family:var(--mono);font-size:11px;word-break:break-all;">${url}</span>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GENERATE
+// ═══════════════════════════════════════════════════════════════════
+async function generatePage() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const focusKw = document.getElementById('focusKw').value.trim();
+  const pageType = document.getElementById('pageType').value;
+  const siteName = document.getElementById('siteName').value || 'My Website';
+  const pageTitle = document.getElementById('pageTitle').value.trim();
+  const wc = parseInt(document.getElementById('wordCount').value) || 1000;
+  const tone = document.getElementById('tone').value;
+  const url = document.getElementById('targetUrl').value.trim() || `https://example.com/${focusKw.toLowerCase().replace(/\s+/g,'-')}/`;
+
+  window._wc = wc;
+  startLoading(focusKw);
+
+  const slug = focusKw.toLowerCase().replace(/\s+/g,'-');
+  const title = pageTitle || (focusKw + ' | ' + siteName);
+  const secList = secKws.length ? secKws.join(', ') : 'none';
+
+  const prompt = `You are an expert SEO content writer. Generate WORDPRESS BODY CONTENT ONLY — no <html>, no <head>, no header, nav, or footer.
+
+INPUTS:
+- Focus Keyword: "${focusKw}"
+- Page Title: "${title}"
+- Secondary Keywords: ${secList}
+- Page Type: ${pageType}
+- Site: ${siteName}
+- URL: ${url}
+- Tone: ${tone}
+- Word Count: ${wc}+ words (HARD minimum)
+- Schema Types: ${schemas.join(', ')}
+
+OUTPUT — WORDPRESS BODY ONLY:
+
+1. SEO META COMMENT:
+<!-- SEO META
+================================================================
+TITLE TAG:
+${title}
+
+META DESCRIPTION:
+[130-155 chars with "${focusKw}" and a CTA]
+
+CANONICAL URL:
+${url}
+
+FOCUS KEYWORD: ${focusKw}
+
+og:title: ${title}
+og:description: [same as META DESCRIPTION]
+og:url: ${url}
+og:type: article
+og:image: https://placehold.co/1200x630?text=${slug}
+
+twitter:card: summary_large_image
+twitter:title: ${title}
+twitter:description: [same as META DESCRIPTION]
+twitter:image: https://placehold.co/1200x630?text=${slug}
+================================================================ -->
+
+2. JSON-LD <script type="application/ld+json"> with: ${schemas.join(', ')}
+   - FAQPage: 5+ real Q&As
+   - BreadcrumbList: 3 levels
+
+3. PAGE BODY:
+- ONE <h1> with "${focusKw}"
+- 5+ <h2> subheadings with secondary keywords
+- H3s under relevant H2s
+- "${focusKw}" in first paragraph
+- ${wc}+ words of real content (NO lorem ipsum)
+- ALL <img> tags MUST have descriptive alt containing keyword
+- Main image: https://placehold.co/800x400?text=${slug} 
+- 3+ internal anchor links: <a href="${url}#id">text</a>
+- FAQ section with 5+ Q&As
+- NO header/nav/footer/sidebar
+
+4. STYLES + SCRIPT:
+- <style> block with .wp-seo- prefixed CSS, responsive
+- FAQ accordion in vanilla JS <script> at bottom`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 16000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      let msg = `API Error ${res.status}`;
+      try { const d = await res.json(); msg = d.error?.message || msg; } catch(e){}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    let html = data.content[0]?.text?.trim() || '';
+    if (!html) throw new Error('Empty response from Claude.');
+
+    const fence = html.match(/^```(?:html)?\s*\n?([\s\S]*?)```\s*$/i);
+    if (fence) html = fence[1].trim();
+
+    if (html.toLowerCase().includes('<!doctype')) {
+      const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      html = body ? body[1].trim() : html.replace(/<head[\s\S]*?<\/head>/i,'').replace(/<\/?(?:html|body|head)[^>]*>/gi,'').trim();
+    }
+
+    if (!html || html.length < 200) throw new Error('Could not extract content. Try again.');
+
+    generatedHTML = html;
+    stopLoading();
+    renderResult(html, focusKw, url);
+    showToast('success', 'Page generated!');
+
+  } catch(err) {
+    stopLoading();
+    showToast('error', err.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOADING
+// ═══════════════════════════════════════════════════════════════════
+const LSTEPS = [
+  { id:'ls1', pct:10, label:'Analyzing keyword strategy...', dur:1800 },
+  { id:'ls2', pct:30, label:'Generating SEO content...', dur:3500 },
+  { id:'ls3', pct:60, label:'Building schema markup...', dur:2200 },
+  { id:'ls4', pct:80, label:'Applying 20 SEO rules...', dur:2000 },
+  { id:'ls5', pct:95, label:'Finalizing design & CSS...', dur:1500 },
+];
+
+let _loadTimer, _stepTimer;
+
+function startLoading(kw) {
+  document.getElementById('loadingOverlay').classList.add('active');
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('loadingKw').textContent = `"${kw}"`;
+  LSTEPS.forEach(s => { const el = document.getElementById(s.id); if(el) el.className = 'lstep'; });
+  document.getElementById('progressFill').style.width = '0%';
+  const start = Date.now();
+  _loadTimer = setInterval(() => {
+    const el = document.getElementById('loadingTimer');
+    if(el) el.textContent = Math.floor((Date.now()-start)/1000)+'s';
+  }, 500);
+  let i = 0;
+  function run() {
+    if (i >= LSTEPS.length) return;
+    const s = LSTEPS[i];
+    if (i > 0) { const p = document.getElementById(LSTEPS[i-1].id); if(p) p.className = 'lstep done'; }
+    const el = document.getElementById(s.id); if(el) el.className = 'lstep active';
+    document.getElementById('progressFill').style.width = s.pct + '%';
+    document.getElementById('loadingStepLabel').textContent = s.label;
+    i++;
+    _stepTimer = setTimeout(run, s.dur);
+  }
+  run();
+}
+
+function stopLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+  document.getElementById('genBtn').disabled = false;
+  clearInterval(_loadTimer); clearTimeout(_stepTimer);
+  document.getElementById('progressFill').style.width = '100%';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER RESULT
+// ═══════════════════════════════════════════════════════════════════
+function renderResult(html, kw, url) {
+  const shell = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0 auto;padding:32px 40px;font-family:-apple-system,sans-serif;max-width:860px;background:#fff;color:#111}*{box-sizing:border-box}</style></head><body>${html}</body></html>`;
+  const blob = new Blob([shell], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const frame = document.getElementById('previewFrame');
+  if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
+  frame._blobUrl = blobUrl;
+  frame.src = blobUrl;
+  document.getElementById('previewUrl').textContent = url;
+
+  document.getElementById('codeBlock').textContent = html;
+  document.getElementById('codeMeta').textContent = html.split('\n').length + ' lines';
+
+  const a = analyzeHTML(html, kw);
+  renderScore(a);
+
+  document.getElementById('resultSection').classList.add('visible');
+  setTimeout(() => document.getElementById('resultSection').scrollIntoView({ behavior:'smooth', block:'start' }), 200);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEO ANALYSIS
+// ═══════════════════════════════════════════════════════════════════
+function analyzeHTML(html, kw) {
+  const kwL = kw.toLowerCase();
+  const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)];
+  const h2s = [...html.matchAll(/<h2[^>]*>/gi)];
+  const imgs = [...html.matchAll(/<img[^>]+>/gi)];
+  const missingAlt = imgs.filter(m => !(/alt\s*=/i.test(m[0])) || /alt\s*=\s*["']\s*["']/i.test(m[0])).length;
+  const bodyText = html.replace(/<[^>]+>/g,' ').toLowerCase();
+  const firstP = (html.match(/<p[^>]*>([\s\S]*?)<\/p>/i)||['',''])[1].replace(/<[^>]+>/g,'').toLowerCase();
+  const titleM = html.match(/TITLE TAG:\s*\n(.*)/i);
+  const titleLen = titleM ? titleM[1].trim().length : 0;
+  const metaM = html.match(/META DESCRIPTION:\s*\n([\s\S]*?)(?=\n\n|\nCANONICAL)/i);
+  const metaText = metaM ? metaM[1].trim() : '';
+  const headings = [...html.matchAll(/<(h[1-6])[^>]*>/gi)].map(m => parseInt(m[1].slice(1)));
+  let flowOk = true;
+  for (let i=1; i<headings.length; i++) if (headings[i]-headings[i-1]>1) { flowOk=false; break; }
+  const secOk = secKws.length === 0 || secKws.every(s => bodyText.includes(s.toLowerCase()));
+  return {
+    titleLen, metaLen: metaText.length,
+    metaHasKw: metaText.toLowerCase().includes(kwL),
+    h1Count: h1s.length,
+    h1HasKw: h1s.some(m => m[1].toLowerCase().includes(kwL)),
+    h2Count: h2s.length,
+    firstParaHasKw: firstP.includes(kwL),
+    hasCanonical: /CANONICAL URL:/i.test(html),
+    hasSchema: /<script[^>]*application\/ld\+json/i.test(html),
+    hasFaqSchema: /FAQPage/i.test(html),
+    hasBreadcrumb: /BreadcrumbList/i.test(html),
+    imgsMissingAlt: missingAlt,
+    hasOg: /og:title/i.test(html),
+    hasTwitter: /twitter:card/i.test(html),
+    wordCount: bodyText.split(/\s+/).length,
+    internalLinks: (html.match(/href="[^"]*#[^"]+"/gi)||[]).length,
+    faqCount: Math.max(
+      (html.match(/<\/summary>|class="faq-answer"/gi)||[]).length,
+      (html.match(/<dt[^>]*>/gi)||[]).length
+    ),
+    headingFlowOk: flowOk,
+    secKwUsed: secOk,
+    hasStyle: /<style/i.test(html),
+  };
+}
+
+function renderRules() {
+  document.getElementById('rulesList').innerHTML = SEO_RULES.map(r =>
+    `<div class="rule-row" id="rr-${r.id}"><div class="rule-dot"></div><span>${r.label}</span></div>`
+  ).join('');
+}
+
+function renderScore(d) {
+  let pass = 0;
+  SEO_RULES.forEach(r => {
+    const ok = r.check(d); if(ok) pass++;
+    const el = document.getElementById('rr-'+r.id);
+    if(el) {
+      el.className = 'rule-row ' + (ok?'pass':'fail');
+      el.innerHTML = `<div class="rule-dot"></div><span>${r.label}</span><span style="margin-left:auto;font-family:var(--mono);font-size:10px;">${ok?'✓':'✗'}</span>`;
+    }
+  });
+  const score = Math.round((pass/SEO_RULES.length)*100);
+  const circ = 175.9;
+  const circle = document.getElementById('scoreCircle');
+  circle.style.strokeDashoffset = circ-(circ*score/100);
+  circle.style.stroke = score>=80?'#16a34a':score>=60?'#d97706':score>=40?'#2563eb':'#dc2626';
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreLabel').textContent = score>=80?'Excellent':score>=60?'Good':score>=40?'Needs Work':'Poor';
+  document.getElementById('scoreSub').textContent = `${pass} of ${SEO_RULES.length} rules passing`;
+  document.getElementById('scoreBadge').textContent = `SEO ${score}/100`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RESULT TABS / ACTIONS
+// ═══════════════════════════════════════════════════════════════════
+function rTab(id, btn) {
+  document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.rtab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('rp-'+id).classList.add('active');
+}
+
+function downloadPage() {
+  if (!generatedHTML) return;
+  const kw = document.getElementById('focusKw').value.trim().toLowerCase().replace(/\s+/g,'-')||'page';
+  const blob = new Blob([generatedHTML],{type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${kw}-seo-page.html`;
+  a.click();
+  showToast('success','Downloaded!');
+}
+
+function copyCode() {
+  if (!generatedHTML) return;
+  navigator.clipboard.writeText(generatedHTML).then(()=>showToast('success','Copied to clipboard!'));
+}
+
+function openNew() {
+  if (!generatedHTML) return;
+  const blob = new Blob([generatedHTML],{type:'text/html'});
+  window.open(URL.createObjectURL(blob),'_blank');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════
+function showToast(type, msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
