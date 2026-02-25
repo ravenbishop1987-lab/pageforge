@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const supabase = require('./supabase');
+const { createClient } = require('@supabase/supabase-js');
+
+// ─── Supabase client ──────────────────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // ─── Auto-create Stripe products if price IDs not set ────────────────
 let cachedPrices = {
@@ -71,54 +77,22 @@ async function ensurePrices() {
 
 ensurePrices();
 
-// ─── Supabase License Helpers ─────────────────────────────────────────
+// ─── DB Helpers ───────────────────────────────────────────────────────
 async function getLicense(email) {
-  if (!email) return null;
   const { data, error } = await supabase
     .from('licenses')
     .select('*')
     .eq('email', email.toLowerCase())
     .single();
-  
-  if (error && error.code !== 'PGRST116') {
-    console.error('getLicense error:', error.message);
-  }
+  if (error) return null;
   return data;
 }
 
-async function upsertLicense(email, licenseData) {
-  const { data, error } = await supabase
+async function setLicense(email, fields) {
+  const { error } = await supabase
     .from('licenses')
-    .upsert({
-      email: email.toLowerCase(),
-      plan: licenseData.plan,
-      active: licenseData.active,
-      customer_id: licenseData.customerId,
-      subscription_id: licenseData.subscriptionId,
-      activated_at: licenseData.activatedAt || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'email' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('upsertLicense error:', error.message);
-    return null;
-  }
-  return data;
-}
-
-async function getLicenseByCustomerId(customerId) {
-  const { data, error } = await supabase
-    .from('licenses')
-    .select('*')
-    .eq('customer_id', customerId)
-    .single();
-  
-  if (error && error.code !== 'PGRST116') {
-    console.error('getLicenseByCustomerId error:', error.message);
-  }
-  return data;
+    .upsert({ email: email.toLowerCase(), ...fields }, { onConflict: 'email' });
+  if (error) console.error('Supabase upsert error:', error.message);
 }
 
 // ─── POST /api/stripe/checkout ────────────────────────────────────────
@@ -150,7 +124,6 @@ router.post('/checkout', async (req, res) => {
     if (email) sessionConfig.customer_email = email;
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
-
     res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
     console.error('Stripe checkout error:', err.message);
@@ -158,7 +131,7 @@ router.post('/checkout', async (req, res) => {
   }
 });
 
-// ─── POST /api/stripe/verify ─────────────────────────────────────────
+// ─── POST /api/stripe/verify ──────────────────────────────────────────
 router.post('/verify', async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
@@ -172,9 +145,7 @@ router.post('/verify', async (req, res) => {
                  session.subscription?.status === 'active' ||
                  session.subscription?.status === 'trialing';
 
-    if (!paid) {
-      return res.status(402).json({ error: 'Payment not completed.' });
-    }
+    if (!paid) return res.status(402).json({ error: 'Payment not completed.' });
 
     const email = session.customer_details?.email?.toLowerCase() ||
                   session.customer?.email?.toLowerCase();
@@ -183,12 +154,12 @@ router.post('/verify', async (req, res) => {
       ? session.customer
       : session.customer?.id;
 
-    await upsertLicense(email, {
+    await setLicense(email, {
       plan,
       active: true,
-      customerId,
-      subscriptionId: session.subscription?.id || null,
-      activatedAt: new Date().toISOString(),
+      customer_id: customerId,
+      subscription_id: session.subscription?.id || null,
+      activated_at: new Date().toISOString(),
     });
 
     console.log(`✅ Access granted: ${email} (${plan})`);
@@ -230,7 +201,7 @@ router.post('/check-access', async (req, res) => {
 // ─── POST /api/stripe/portal ──────────────────────────────────────────
 router.post('/portal', async (req, res) => {
   const { email } = req.body;
-  const record = await getLicense(email?.toLowerCase());
+  const record = await getLicense(email);
 
   if (!record?.customer_id) {
     return res.status(404).json({ error: 'No subscription found for this email.' });
@@ -247,9 +218,8 @@ router.post('/portal', async (req, res) => {
   }
 });
 
-// ─── Export helpers for webhook ──────────────────────────────────────
+// ─── Export helpers for webhook ───────────────────────────────────────
 router.getLicense = getLicense;
-router.upsertLicense = upsertLicense;
-router.getLicenseByCustomerId = getLicenseByCustomerId;
+router.setLicense = setLicense;
 
 module.exports = router;

@@ -20,7 +20,19 @@ module.exports = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  const { getLicense, upsertLicense, getLicenseByCustomerId } = stripeRouter;
+  const { getLicense, setLicense } = stripeRouter;
+
+  // ─── Helper: find email by customerId from Supabase ───────────────
+  async function findEmailByCustomerId(customerId) {
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const { data } = await supabase
+      .from('licenses')
+      .select('email')
+      .eq('customer_id', customerId)
+      .single();
+    return data?.email || null;
+  }
 
   console.log(`📨 Webhook: ${event.type}`);
 
@@ -29,16 +41,11 @@ module.exports = async (req, res) => {
     // ── Subscription renewed successfully ──────────────────────────
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object;
-      const customerId = invoice.customer;
-      const record = await getLicenseByCustomerId(customerId);
-      if (record) {
-        await upsertLicense(record.email, {
-          ...record,
-          customerId: record.customer_id,
-          subscriptionId: record.subscription_id,
-          active: true,
-        });
-        console.log(`✅ Renewal OK: ${record.email}`);
+      const email = await findEmailByCustomerId(invoice.customer);
+      if (email) {
+        const record = await getLicense(email);
+        await setLicense(email, { ...record, active: true });
+        console.log(`✅ Renewal OK: ${email}`);
       }
       break;
     }
@@ -46,12 +53,9 @@ module.exports = async (req, res) => {
     // ── Payment failed ─────────────────────────────────────────────
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
-      const customerId = invoice.customer;
-      const record = await getLicenseByCustomerId(customerId);
-      if (record) {
-        // Optional: disable after N failures
-        // await upsertLicense(record.email, { ...record, active: false });
-        console.log(`⚠️  Payment failed for: ${record.email}`);
+      const email = await findEmailByCustomerId(invoice.customer);
+      if (email) {
+        console.log(`⚠️  Payment failed for: ${email}`);
       }
       break;
     }
@@ -59,34 +63,26 @@ module.exports = async (req, res) => {
     // ── Subscription cancelled / expired ───────────────────────────
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
-      const customerId = sub.customer;
-      const record = await getLicenseByCustomerId(customerId);
-      if (record && record.plan === 'monthly') {
-        await upsertLicense(record.email, {
-          ...record,
-          customerId: record.customer_id,
-          subscriptionId: record.subscription_id,
-          active: false,
-        });
-        console.log(`❌ Subscription cancelled: ${record.email}`);
+      const email = await findEmailByCustomerId(sub.customer);
+      if (email) {
+        const record = await getLicense(email);
+        if (record?.plan === 'monthly') {
+          await setLicense(email, { ...record, active: false });
+          console.log(`❌ Subscription cancelled: ${email}`);
+        }
       }
       break;
     }
 
-    // ── Subscription updated (plan change, etc.) ───────────────────
+    // ── Subscription updated ───────────────────────────────────────
     case 'customer.subscription.updated': {
       const sub = event.data.object;
-      const customerId = sub.customer;
-      const record = await getLicenseByCustomerId(customerId);
-      if (record) {
+      const email = await findEmailByCustomerId(sub.customer);
+      if (email) {
         const active = ['active', 'trialing'].includes(sub.status);
-        await upsertLicense(record.email, {
-          ...record,
-          customerId: record.customer_id,
-          subscriptionId: record.subscription_id,
-          active,
-        });
-        console.log(`🔄 Subscription updated: ${record.email} → ${sub.status}`);
+        const record = await getLicense(email);
+        await setLicense(email, { ...record, active });
+        console.log(`🔄 Subscription updated: ${email} → ${sub.status}`);
       }
       break;
     }
@@ -97,12 +93,12 @@ module.exports = async (req, res) => {
       if (session.mode === 'payment' && session.payment_status === 'paid') {
         const email = session.customer_details?.email?.toLowerCase();
         if (email) {
-          await upsertLicense(email, {
+          await setLicense(email, {
             plan: 'lifetime',
             active: true,
-            customerId: session.customer,
-            subscriptionId: null,
-            activatedAt: new Date().toISOString(),
+            customer_id: session.customer,
+            subscription_id: null,
+            activated_at: new Date().toISOString(),
           });
           console.log(`🏆 Lifetime access granted: ${email}`);
         }
